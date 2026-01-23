@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useDailyLogs } from "@/lib/daily-logs-context"
+import { supabase } from "@/lib/supabase"
 import { useMasterData } from "@/lib/master-data-context"
 import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
@@ -11,6 +11,27 @@ import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
+
+interface DailyLog {
+  id: string
+  batchId: string
+  houseId: string
+  sectionId?: string
+  sectionMortality?: Record<string, number>
+  date: string
+  openingBirds: number
+  mortality: number
+  closingBirds: number
+  feedTypeId: string
+  cumulativeMortality: number
+  cumulativeFeed: number
+  cumulativeMortalityPercent: number
+  cumulativeFCR: number
+  temperature?: number
+  humidity?: number
+  remarks: string
+  createdAt: string
+}
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,13 +56,15 @@ interface MortalityBySection {
 }
 
 export default function DailyLogsPage() {
-  const { dailyLogs, addDailyLog, updateDailyLog, deleteDailyLog, getLastLogForBatch } = useDailyLogs()
   const { houses: allHouses, farms: allFarms, feedTypes } = useMasterData()
   const { batches, getActiveBatchByHouse } = useBatch()
   const { user } = useAuth()
   const { getWorkersByIds, getWorkerById } = useWorkers()
   const { getSectionsByBatch, sections } = useBatchSections()
   const { weeklyFeeds, addWeeklyFeed, deleteWeeklyFeed, getFeedsByBatch } = useWeeklyFeed()
+  
+  const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([])
+  const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isWeeklyFeedDialogOpen, setIsWeeklyFeedDialogOpen] = useState(false)
   const [filterHouse, setFilterHouse] = useState<string>("all")
@@ -69,6 +92,44 @@ export default function DailyLogsPage() {
   const [mortalityBySection, setMortalityBySection] = useState<Record<string, number>>({})
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Fetch daily logs from Supabase
+  useEffect(() => {
+    fetchDailyLogs()
+  }, [])
+
+  const fetchDailyLogs = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('daily_logs')
+        .select('*')
+        .order('date', { ascending: false })
+
+      if (error) throw error
+      setDailyLogs(data || [])
+    } catch (error) {
+      console.error('Error fetching daily logs:', error)
+      // If table doesn't exist, that's OK - it will be created
+      if ((error as any).code !== 'PGRST116') {
+        alert('Failed to load daily logs data')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getLastLogForBatch = (batchId: string, beforeDate?: string) => {
+    const batchLogs = dailyLogs
+      .filter((log) => log.batchId === batchId)
+      .filter((log) => !beforeDate || log.date < beforeDate)
+      .sort((a, b) => {
+        const dateCompare = b.date.localeCompare(a.date)
+        if (dateCompare !== 0) return dateCompare
+        return b.createdAt.localeCompare(a.createdAt)
+      })
+    return batchLogs[0]
+  }
 
   const farms = filterVisibleFarms(user, allFarms)
   const houses = filterVisibleHouses(user, allHouses, allFarms)
@@ -141,7 +202,48 @@ export default function DailyLogsPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const calculateCumulativeValues = (batchId: string, allLogs: DailyLog[], newLog: DailyLog) => {
+    const batch = batches.find(b => b.id === batchId)
+    const initialBirds = batch?.initialBirds || 0
+    
+    const batchLogs = [...allLogs.filter(l => l.batchId === batchId && l.id !== newLog.id), newLog]
+      .sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date)
+        if (dateCompare !== 0) return dateCompare
+        return a.createdAt.localeCompare(b.createdAt)
+      })
+
+    const recalculatedLogs: DailyLog[] = []
+    for (let index = 0; index < batchLogs.length; index++) {
+      const currentLog = batchLogs[index]
+      const openingBirds = index === 0 ? initialBirds : recalculatedLogs[index - 1].closingBirds
+      const closingBirds = openingBirds - currentLog.mortality
+      const cumulativeMortality = index === 0 ? currentLog.mortality : recalculatedLogs[index - 1].cumulativeMortality + currentLog.mortality
+      
+      // Get cumulative feed from weekly feeds
+      const batchWeeklyFeeds = weeklyFeeds.filter(f => f.batchId === batchId)
+      const cumulativeFeed = batchWeeklyFeeds
+        .filter(f => f.weekEnd <= currentLog.date)
+        .reduce((sum, f) => sum + f.totalFeedKg, 0)
+      
+      const cumulativeMortalityPercent = initialBirds > 0 ? (cumulativeMortality / initialBirds) * 100 : 0
+      const cumulativeFCR = 0 // FCR calculation removed
+
+      recalculatedLogs.push({
+        ...currentLog,
+        openingBirds,
+        closingBirds,
+        cumulativeMortality,
+        cumulativeFeed,
+        cumulativeMortalityPercent,
+        cumulativeFCR,
+      })
+    }
+
+    return recalculatedLogs.find(l => l.id === newLog.id)!
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const selectedBatch = formData.houseId ? getActiveBatchByHouse(formData.houseId) : null
@@ -157,48 +259,59 @@ export default function DailyLogsPage() {
     const hasSections = batchSections.length > 0
     const sectionMortalityData = hasSections ? mortalityBySection : undefined
 
-    console.log("[v0] === SAVE START ===")
-    console.log("[v0] hasSections:", hasSections)
-    console.log("[v0] batchSections:", batchSections)
-    console.log("[v0] mortalityBySection state:", mortalityBySection)
-    console.log("[v0] sectionMortalityData to save:", sectionMortalityData)
-    console.log("[v0] totalMortality:", totalMortality)
+    try {
+      const yesterdayLog = getLastLogForBatch(selectedBatch.id, formData.date)
+      const openingBirds = yesterdayLog ? yesterdayLog.closingBirds : selectedBatch.initialBirds
+      const closingBirds = openingBirds - totalMortality
 
-    if (editingLog) {
-      const isDifferentDate = formData.date !== dailyLogs.find((l) => l.id === editingLog)?.date
-      if (isDifferentDate) {
-        const existingLogOnNewDate = dailyLogs.find(
-          (l) => l.batchId === selectedBatch.id && l.date === formData.date && l.id !== editingLog,
+      if (editingLog) {
+        const isDifferentDate = formData.date !== dailyLogs.find((l) => l.id === editingLog)?.date
+        if (isDifferentDate) {
+          const existingLogOnNewDate = dailyLogs.find(
+            (l) => l.batchId === selectedBatch.id && l.date === formData.date && l.id !== editingLog,
+          )
+          if (existingLogOnNewDate) {
+            alert(`A daily log already exists for this batch on ${formData.date}. Only one entry per day is allowed.`)
+            return
+          }
+        }
+
+        const updatedLog: Partial<DailyLog> = {
+          houseId: formData.houseId,
+          date: formData.date,
+          mortality: totalMortality,
+          sectionMortality: sectionMortalityData,
+          feedTypeId: formData.feedTypeId,
+          temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
+          humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
+          remarks: formData.remarks,
+        }
+
+        // Recalculate cumulative values
+        const allLogs = dailyLogs.map(l => l.id === editingLog ? { ...l, ...updatedLog } as DailyLog : l)
+        const recalculated = calculateCumulativeValues(selectedBatch.id, allLogs, { ...dailyLogs.find(l => l.id === editingLog)!, ...updatedLog } as DailyLog)
+
+        const { error } = await supabase
+          .from('daily_logs')
+          .update({
+            ...recalculated,
+            sectionMortality: sectionMortalityData ? JSON.stringify(sectionMortalityData) : null,
+          })
+          .eq('id', editingLog)
+
+        if (error) throw error
+        setEditingLog(null)
+      } else {
+        // Check for existing log
+        const existingLog = dailyLogs.find(
+          (l) => l.batchId === selectedBatch.id && l.date === formData.date,
         )
-        if (existingLogOnNewDate) {
+        if (existingLog) {
           alert(`A daily log already exists for this batch on ${formData.date}. Only one entry per day is allowed.`)
           return
         }
-      }
 
-      updateDailyLog(editingLog, {
-        houseId: formData.houseId,
-        date: formData.date,
-        mortality: totalMortality,
-        sectionMortality: sectionMortalityData,
-        feedTypeId: formData.feedTypeId,
-        temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
-        humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
-        remarks: formData.remarks,
-      })
-
-      setTimeout(() => {
-        const savedLogs = JSON.parse(localStorage.getItem("poultry_daily_logs") || "[]")
-        const savedLog = savedLogs.find((l: any) => l.id === editingLog)
-        console.log("[v0] === AFTER UPDATE ===")
-        console.log("[v0] Saved log in localStorage:", savedLog)
-        console.log("[v0] Saved log sectionMortality:", savedLog?.sectionMortality)
-      }, 100)
-
-      setEditingLog(null)
-    } else {
-      try {
-        const newLog = addDailyLog({
+        const newLog: Omit<DailyLog, 'id' | 'createdAt' | 'openingBirds' | 'closingBirds' | 'cumulativeMortality' | 'cumulativeFeed' | 'cumulativeMortalityPercent' | 'cumulativeFCR'> = {
           batchId: selectedBatch.id,
           houseId: formData.houseId,
           date: formData.date,
@@ -208,37 +321,47 @@ export default function DailyLogsPage() {
           temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
           humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
           remarks: formData.remarks,
-        })
+          openingBirds: 0,
+          closingBirds: 0,
+          cumulativeMortality: 0,
+          cumulativeFeed: 0,
+          cumulativeMortalityPercent: 0,
+          cumulativeFCR: 0,
+        }
 
-        console.log("[v0] === NEW LOG CREATED ===")
-        console.log("[v0] newLog returned:", newLog)
+        // Calculate cumulative values
+        const allLogs = [...dailyLogs, newLog as DailyLog]
+        const recalculated = calculateCumulativeValues(selectedBatch.id, allLogs, newLog as DailyLog)
 
-        setTimeout(() => {
-          const savedLogs = JSON.parse(localStorage.getItem("poultry_daily_logs") || "[]")
-          const savedLog = savedLogs.find((l: any) => l.id === newLog.id)
-          console.log("[v0] === AFTER SAVE ===")
-          console.log("[v0] Saved log in localStorage:", savedLog)
-          console.log("[v0] Saved log sectionMortality:", savedLog?.sectionMortality)
-        }, 100)
+        const { data, error } = await supabase
+          .from('daily_logs')
+          .insert({
+            ...recalculated,
+            sectionMortality: sectionMortalityData ? JSON.stringify(sectionMortalityData) : null,
+          })
+          .select()
+          .single()
 
-        setLastSavedLog({ ...newLog, batch: selectedBatch })
-      } catch (error) {
-        alert(error instanceof Error ? error.message : "Failed to add daily log")
-        return
+        if (error) throw error
+        setLastSavedLog({ ...data, batch: selectedBatch })
       }
-    }
 
-    setFormData({
-      houseId: "",
-      date: getTodayDate(),
-      mortality: "",
-      feedTypeId: "",
-      temperature: "",
-      humidity: "",
-      remarks: "",
-    })
-    setMortalityBySection({})
-    setIsDialogOpen(false)
+      await fetchDailyLogs()
+      setFormData({
+        houseId: "",
+        date: getTodayDate(),
+        mortality: "",
+        feedTypeId: "",
+        temperature: "",
+        humidity: "",
+        remarks: "",
+      })
+      setMortalityBySection({})
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error('Error saving daily log:', error)
+      alert(error instanceof Error ? error.message : "Failed to save daily log")
+    }
   }
 
   const handleWeeklyFeedSubmit = (e: React.FormEvent) => {
@@ -325,9 +448,20 @@ export default function DailyLogsPage() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this log?")) {
-      deleteDailyLog(id)
+      try {
+        const { error } = await supabase
+          .from('daily_logs')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+        await fetchDailyLogs()
+      } catch (error) {
+        console.error('Error deleting daily log:', error)
+        alert('Failed to delete daily log. Please try again.')
+      }
     }
   }
 

@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useInventory } from "@/lib/inventory-context"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
 import { useMasterData } from "@/lib/master-data-context"
 import { useFinance } from "@/lib/finance-context"
 import { getTodayDate, getFirstDayOfYear, getLastDayOfYear } from "@/lib/date-utils"
@@ -23,10 +23,27 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
+interface Sale {
+  id: string
+  date: string
+  buyerId: string
+  birds: number
+  avgWeightKg: number
+  liveWeightKg: number
+  ratePerKg: number
+  totalValue: number
+  invoiceNumber: string
+  remarks: string
+  financeTransactionId?: string
+  createdAt: string
+}
+
 export default function SalesPage() {
-  const { sales, addSale, updateSale, deleteSale, linkSaleToFinance, getSaleById, getTotalBirdsSold, getTotalRevenue } = useInventory()
   const { buyers } = useMasterData()
   const { transactions, getTotalExpenses, addTransaction, updateTransaction, deleteTransaction } = useFinance()
+  
+  const [sales, setSales] = useState<Sale[]>([])
+  const [loading, setLoading] = useState(true)
 
   const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false)
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null)
@@ -42,14 +59,53 @@ export default function SalesPage() {
     remarks: "",
   })
 
+  // Fetch sales from Supabase
+  useEffect(() => {
+    fetchSales()
+  }, [])
+
+  const fetchSales = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*')
+        .order('date', { ascending: false })
+
+      if (error) {
+        console.error('Supabase fetch error:', error)
+        // If table doesn't exist, show helpful message
+        if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+          console.warn('Sales table does not exist yet. Please create it in Supabase.')
+          setSales([])
+          return
+        }
+        throw error
+      }
+      console.log('Fetched sales:', data?.length || 0, 'records')
+      setSales(data || [])
+    } catch (error) {
+      console.error('Error fetching sales:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Full error details:', error)
+      // Don't show alert on initial load if table doesn't exist
+      if (!errorMessage.includes('does not exist') && !errorMessage.includes('PGRST116')) {
+        alert(`Failed to load sales data: ${errorMessage}`)
+      }
+      setSales([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Filter sales by buyer
   const filteredSales = selectedBuyerId === "all" 
     ? sales 
     : sales.filter((sale) => sale.buyerId === selectedBuyerId)
 
   // Calculate statistics
-  const totalSales = getTotalRevenue()
-  const totalBirdsSold = getTotalBirdsSold()
+  const totalSales = sales.reduce((sum, sale) => sum + sale.totalValue, 0)
+  const totalBirdsSold = sales.reduce((sum, sale) => sum + sale.birds, 0)
   const uniqueBuyers = new Set(sales.map((sale) => sale.buyerId)).size
   
   // Calculate feed expenses (from finance transactions with "Feed Purchase" category)
@@ -74,7 +130,7 @@ export default function SalesPage() {
   const formatINR = (amount: number) =>
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
-  const handleAddSale = (e: React.FormEvent) => {
+  const handleAddSale = async (e: React.FormEvent) => {
     e.preventDefault()
     const birds = Number.parseFloat(saleForm.birds)
     const avgWeightKg = Number.parseFloat(saleForm.avgWeightKg)
@@ -83,37 +139,98 @@ export default function SalesPage() {
     const totalValue = liveWeightKg * ratePerKg
     const buyer = buyers.find((b) => b.id === saleForm.buyerId)
     
-    if (editingSaleId) {
-      // Update existing sale
-      const existingSale = getSaleById(editingSaleId)
-      if (!existingSale) return
+    try {
+      if (editingSaleId) {
+        // Update existing sale
+        const existingSale = sales.find(s => s.id === editingSaleId)
+        if (!existingSale) return
 
-      updateSale(editingSaleId, {
-        date: saleForm.date,
-        buyerId: saleForm.buyerId,
-        birds,
-        avgWeightKg,
-        ratePerKg,
-        invoiceNumber: saleForm.invoiceNumber,
-        remarks: saleForm.remarks,
-      })
+        const { error: updateError } = await supabase
+          .from('sales')
+          .update({
+            date: saleForm.date,
+            buyerId: saleForm.buyerId,
+            birds,
+            avgWeightKg,
+            ratePerKg,
+            liveWeightKg,
+            totalValue,
+            invoiceNumber: saleForm.invoiceNumber,
+            remarks: saleForm.remarks,
+          })
+          .eq('id', editingSaleId)
 
-      // Update or create finance income
-      if (existingSale.financeTransactionId) {
-        const description = buyer 
-          ? `Broiler Sale to ${buyer.name} - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
-          : `Broiler Sale - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
-        const invoiceRef = saleForm.invoiceNumber ? ` ${saleForm.invoiceNumber}` : ""
-        
-        updateTransaction(existingSale.financeTransactionId, {
-          type: "income",
-          category: "Broiler Sales",
-          amount: totalValue,
-          date: saleForm.date,
-          description: `${description}${invoiceRef}`,
-          reference: saleForm.invoiceNumber || "",
-        })
+        if (updateError) throw updateError
+
+        // Update or create finance income
+        if (existingSale.financeTransactionId) {
+          const description = buyer 
+            ? `Broiler Sale to ${buyer.name} - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
+            : `Broiler Sale - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
+          const invoiceRef = saleForm.invoiceNumber ? ` ${saleForm.invoiceNumber}` : ""
+          
+          updateTransaction(existingSale.financeTransactionId, {
+            type: "income",
+            category: "Broiler Sales",
+            amount: totalValue,
+            date: saleForm.date,
+            description: `${description}${invoiceRef}`,
+            reference: saleForm.invoiceNumber || "",
+          })
+        } else {
+          const description = buyer 
+            ? `Broiler Sale to ${buyer.name} - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
+            : `Broiler Sale - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
+          const invoiceRef = saleForm.invoiceNumber ? ` ${saleForm.invoiceNumber}` : ""
+          
+          const financeTransaction = addTransaction({
+            type: "income",
+            category: "Broiler Sales",
+            amount: totalValue,
+            date: saleForm.date,
+            description: `${description}${invoiceRef}`,
+            reference: saleForm.invoiceNumber || "",
+          })
+
+          if (financeTransaction) {
+            await supabase
+              .from('sales')
+              .update({ financeTransactionId: financeTransaction.id })
+              .eq('id', editingSaleId)
+          }
+        }
       } else {
+        // Add new sale
+        const saleData = {
+          id: Date.now().toString(), // Generate ID client-side
+          date: saleForm.date,
+          buyerId: saleForm.buyerId, // Supabase will handle camelCase to quoted column mapping
+          birds,
+          avgWeightKg,
+          ratePerKg,
+          liveWeightKg,
+          totalValue,
+          invoiceNumber: saleForm.invoiceNumber || null,
+          remarks: saleForm.remarks || null,
+          createdAt: new Date().toISOString(),
+        }
+        
+        console.log('Inserting sale:', saleData)
+        
+        const { data: newSale, error: insertError } = await supabase
+          .from('sales')
+          .insert(saleData)
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Insert error details:', insertError)
+          throw new Error(`Failed to save sale: ${insertError.message}. Please check if the 'sales' table exists in Supabase.`)
+        }
+        
+        console.log('Sale inserted successfully:', newSale)
+
+        // Create finance income automatically
         const description = buyer 
           ? `Broiler Sale to ${buyer.name} - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
           : `Broiler Sale - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
@@ -128,44 +245,22 @@ export default function SalesPage() {
           reference: saleForm.invoiceNumber || "",
         })
 
-        if (financeTransaction) {
-          linkSaleToFinance(editingSaleId, financeTransaction.id)
+        if (financeTransaction && newSale) {
+          await supabase
+            .from('sales')
+            .update({ financeTransactionId: financeTransaction.id })
+            .eq('id', newSale.id)
         }
       }
-    } else {
-      // Add new sale
-      const newSale = addSale({
-        date: saleForm.date,
-        buyerId: saleForm.buyerId,
-        birds,
-        avgWeightKg,
-        ratePerKg,
-        invoiceNumber: saleForm.invoiceNumber,
-        remarks: saleForm.remarks,
-      })
-
-      // Create finance income automatically
-      const description = buyer 
-        ? `Broiler Sale to ${buyer.name} - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
-        : `Broiler Sale - ${birds} birds (${liveWeightKg.toFixed(0)}kg)`
-      const invoiceRef = saleForm.invoiceNumber ? ` ${saleForm.invoiceNumber}` : ""
       
-      const financeTransaction = addTransaction({
-        type: "income",
-        category: "Broiler Sales",
-        amount: totalValue,
-        date: saleForm.date,
-        description: `${description}${invoiceRef}`,
-        reference: saleForm.invoiceNumber || "",
-      })
-
-      if (financeTransaction && newSale) {
-        linkSaleToFinance(newSale.id, financeTransaction.id)
-      }
+      await fetchSales()
+      resetSaleForm()
+      setIsSaleDialogOpen(false)
+    } catch (error) {
+      console.error('Error saving sale:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to save sale: ${errorMessage}\n\nPlease check:\n1. Supabase 'sales' table exists\n2. Table schema matches the expected fields\n3. RLS is disabled or you have proper permissions`)
     }
-    
-    resetSaleForm()
-    setIsSaleDialogOpen(false)
   }
 
   const resetSaleForm = () => {
@@ -195,16 +290,28 @@ export default function SalesPage() {
     setIsSaleDialogOpen(true)
   }
 
-  const handleDeleteSale = (sale: any) => {
+  const handleDeleteSale = async (sale: Sale) => {
     const buyer = buyers.find((b) => b.id === sale.buyerId)
     const buyerName = buyer ? buyer.name : "Unknown"
     const confirmMessage = `Delete sale to ${buyerName} on ${new Date(sale.date).toLocaleDateString()}?\n\nThis will:\n- Remove ${sale.birds} birds from sales\n- Remove ₹${sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })} from finance income`
 
     if (confirm(confirmMessage)) {
-      if (sale.financeTransactionId) {
-        deleteTransaction(sale.financeTransactionId)
+      try {
+        if (sale.financeTransactionId) {
+          deleteTransaction(sale.financeTransactionId)
+        }
+        
+        const { error } = await supabase
+          .from('sales')
+          .delete()
+          .eq('id', sale.id)
+
+        if (error) throw error
+        await fetchSales()
+      } catch (error) {
+        console.error('Error deleting sale:', error)
+        alert('Failed to delete sale. Please try again.')
       }
-      deleteSale(sale.id)
     }
   }
 
@@ -409,7 +516,12 @@ export default function SalesPage() {
                 </div>
               </div>
 
-              {filteredSales.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+                  <p className="text-muted-foreground mt-4">Loading sales...</p>
+                </div>
+              ) : filteredSales.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground mb-4">No sales recorded yet</p>
                   <Button onClick={startAddNewSale}>

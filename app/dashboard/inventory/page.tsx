@@ -4,13 +4,52 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { useInventory } from "@/lib/inventory-context"
+import { supabase } from "@/lib/supabase"
 import { useMasterData } from "@/lib/master-data-context"
 import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
+
+interface InventoryItem {
+  id: string
+  code: string
+  name: string
+  category: string
+  unit: string
+  openingStock: number
+  openingValue: number
+  currentStock: number
+  averageCost: number
+  reorderLevel: number
+  createdAt: string
+}
+
+interface PurchaseEntry {
+  id: string
+  date: string
+  supplierId: string
+  itemId: string
+  quantity: number
+  unitRate: number
+  totalAmount: number
+  invoiceNumber: string
+  financeTransactionId?: string
+  createdAt: string
+}
+
+interface IssueEntry {
+  id: string
+  date: string
+  batchId: string
+  itemId: string
+  quantity: number
+  costPerUnit: number
+  totalCost: number
+  purpose: string
+  createdAt: string
+}
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -50,11 +89,15 @@ export default function InventoryPage() {
   
   const activeTab = activeTabState
   
-  const { items, purchases, issues, addItem, updateItem, deleteItem, addPurchase, updatePurchase, deletePurchase, linkPurchaseToFinance, addIssue, getLowStockItems, getItemById, getIssuesByItem, getPurchaseById } = useInventory()
   const { suppliers, houses, farms } = useMasterData()
   const { batches } = useBatch()
   const { user } = useAuth()
   const { addTransaction, updateTransaction, deleteTransaction, transactions } = useFinance()
+
+  const [items, setItems] = useState<InventoryItem[]>([])
+  const [purchases, setPurchases] = useState<PurchaseEntry[]>([])
+  const [issues, setIssues] = useState<IssueEntry[]>([])
+  const [loading, setLoading] = useState(true)
 
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false)
@@ -89,32 +132,109 @@ export default function InventoryPage() {
     purpose: "",
   })
 
-  const handleAddItem = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (editingItemId) {
-      // Update existing item - only update editable fields, not openingStock/openingValue
-      // (those are historical and shouldn't be changed after purchases/issues exist)
-      updateItem(editingItemId, {
-        code: itemForm.code,
-        name: itemForm.name,
-        category: itemForm.category,
-        unit: itemForm.unit,
-        reorderLevel: Number.parseFloat(itemForm.reorderLevel),
-      })
-    } else {
-      // Add new item
-      addItem({
-        code: itemForm.code,
-        name: itemForm.name,
-        category: itemForm.category,
-        unit: itemForm.unit,
-        openingStock: Number.parseFloat(itemForm.openingStock),
-        openingValue: Number.parseFloat(itemForm.openingValue),
-        reorderLevel: Number.parseFloat(itemForm.reorderLevel),
-      })
+  // Fetch data from Supabase
+  useEffect(() => {
+    fetchInventoryData()
+  }, [])
+
+  const fetchInventoryData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch items
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('inventory')
+        .select('*')
+        .order('code')
+      
+      if (itemsError) throw itemsError
+      
+      // Fetch purchases - assuming there's a 'purchases' table
+      const { data: purchasesData, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('*')
+        .order('date', { ascending: false })
+      
+      if (purchasesError && purchasesError.code !== 'PGRST116') {
+        console.warn('Purchases table error:', purchasesError)
+      }
+      
+      // Note: Issues might need a separate table or be part of inventory
+      // For now, we'll fetch from a potential 'issues' table
+      const { data: issuesData, error: issuesError } = await supabase
+        .from('issues')
+        .select('*')
+        .order('date', { ascending: false })
+      
+      if (issuesError && issuesError.code !== 'PGRST116') {
+        // PGRST116 = table doesn't exist, which is OK for now
+        console.warn('Issues table not found:', issuesError)
+      }
+      
+      setItems(itemsData || [])
+      setPurchases(purchasesData || [])
+      setIssues(issuesData || [])
+    } catch (error) {
+      console.error('Error fetching inventory data:', error)
+      alert('Failed to load inventory data')
+    } finally {
+      setLoading(false)
     }
-    resetItemForm()
-    setIsItemDialogOpen(false)
+  }
+
+  // Helper functions
+  const getItemById = (id: string) => items.find(i => i.id === id)
+  const getIssuesByItem = (itemId: string) => issues.filter(i => i.itemId === itemId)
+  const getPurchaseById = (id: string) => purchases.find(p => p.id === id)
+  const getLowStockItems = () => items.filter(item => item.currentStock <= item.reorderLevel)
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const openingStock = Number.parseFloat(itemForm.openingStock)
+      const openingValue = Number.parseFloat(itemForm.openingValue)
+      const averageCost = openingStock > 0 ? openingValue / openingStock : 0
+
+      if (editingItemId) {
+        // Update existing item
+        const { error } = await supabase
+          .from('inventory')
+          .update({
+            code: itemForm.code,
+            name: itemForm.name,
+            category: itemForm.category,
+            unit: itemForm.unit,
+            reorderLevel: Number.parseFloat(itemForm.reorderLevel),
+          })
+          .eq('id', editingItemId)
+
+        if (error) throw error
+      } else {
+        // Add new item
+        const { error } = await supabase
+          .from('inventory')
+          .insert({
+            code: itemForm.code,
+            name: itemForm.name,
+            category: itemForm.category,
+            unit: itemForm.unit,
+            openingStock,
+            openingValue,
+            currentStock: openingStock,
+            averageCost,
+            reorderLevel: Number.parseFloat(itemForm.reorderLevel),
+          })
+
+        if (error) throw error
+      }
+      
+      await fetchInventoryData()
+      resetItemForm()
+      setIsItemDialogOpen(false)
+    } catch (error) {
+      console.error('Error saving item:', error)
+      alert('Failed to save item. Please try again.')
+    }
   }
 
   const resetItemForm = () => {
@@ -144,7 +264,7 @@ export default function InventoryPage() {
     setIsItemDialogOpen(true)
   }
 
-  const handleDelete = (item: any) => {
+  const handleDelete = async (item: InventoryItem) => {
     // Check if item has stock
     const hasStock = item.currentStock > 0
     const itemName = `${item.code} - ${item.name}`
@@ -158,7 +278,18 @@ export default function InventoryPage() {
     }
 
     if (confirm(confirmMessage)) {
-      deleteItem(item.id)
+      try {
+        const { error } = await supabase
+          .from('inventory')
+          .delete()
+          .eq('id', item.id)
+
+        if (error) throw error
+        await fetchInventoryData()
+      } catch (error) {
+        console.error('Error deleting item:', error)
+        alert('Failed to delete item. Please try again.')
+      }
     }
   }
 
@@ -167,7 +298,7 @@ export default function InventoryPage() {
     setIsItemDialogOpen(true)
   }
 
-  const handleAddPurchase = (e: React.FormEvent) => {
+  const handleAddPurchase = async (e: React.FormEvent) => {
     e.preventDefault()
     const quantity = Number.parseFloat(purchaseForm.quantity)
     const unitRate = Number.parseFloat(purchaseForm.unitRate)
@@ -175,106 +306,142 @@ export default function InventoryPage() {
     const item = getItemById(purchaseForm.itemId)
     const supplier = suppliers.find((s) => s.id === purchaseForm.supplierId)
     
-    if (editingPurchaseId) {
-      // Update existing purchase
-      const existingPurchase = getPurchaseById(editingPurchaseId)
-      if (!existingPurchase) return
+    try {
+      if (editingPurchaseId) {
+        // Update existing purchase
+        const existingPurchase = getPurchaseById(editingPurchaseId)
+        if (!existingPurchase) return
 
-      updatePurchase(editingPurchaseId, {
-        date: purchaseForm.date,
-        supplierId: purchaseForm.supplierId,
-        itemId: purchaseForm.itemId,
-        quantity,
-        unitRate,
-        invoiceNumber: purchaseForm.invoiceNumber,
-      })
+        const { error: updateError } = await supabase
+          .from('purchases')
+          .update({
+            date: purchaseForm.date,
+            supplierId: purchaseForm.supplierId,
+            itemId: purchaseForm.itemId,
+            quantity,
+            unitRate,
+            totalAmount,
+            invoiceNumber: purchaseForm.invoiceNumber,
+          })
+          .eq('id', editingPurchaseId)
 
-      // Update or create finance expense
-      if (existingPurchase.financeTransactionId) {
-        // Update existing finance transaction
-        const description = item 
-          ? `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-          : `Purchase ${quantity.toFixed(0)} units`
-        const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-        
-        updateTransaction(existingPurchase.financeTransactionId, {
-          type: "expense",
-          category: "Feed Purchase",
-          amount: totalAmount,
-          date: purchaseForm.date,
-          description: `${description}${invoiceRef}`,
-          reference: purchaseForm.invoiceNumber || "",
-        })
-      } else if (item) {
-        // Create new finance transaction if it doesn't exist
-        const description = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-        const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-        
-        const financeTransaction = addTransaction({
-          type: "expense",
-          category: "Feed Purchase",
-          amount: totalAmount,
-          date: purchaseForm.date,
-          description: `${description}${invoiceRef}`,
-          reference: purchaseForm.invoiceNumber || "",
-        })
+        if (updateError) throw updateError
 
-        // Link finance transaction to purchase
-        if (financeTransaction) {
-          linkPurchaseToFinance(editingPurchaseId, financeTransaction.id)
+        // Update item stock and average cost
+        if (item) {
+          const oldValue = item.currentStock * item.averageCost
+          const newValue = quantity * unitRate
+          const newStock = item.currentStock + quantity
+          const newAverageCost = newStock > 0 ? (oldValue + newValue) / newStock : 0
+
+          await supabase
+            .from('inventory')
+            .update({
+              currentStock: newStock,
+              averageCost: newAverageCost,
+            })
+            .eq('id', purchaseForm.itemId)
+        }
+
+        // Update or create finance expense
+        if (existingPurchase.financeTransactionId) {
+          const description = item 
+            ? `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
+            : `Purchase ${quantity.toFixed(0)} units`
+          const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
+          
+          updateTransaction(existingPurchase.financeTransactionId, {
+            type: "expense",
+            category: "Feed Purchase",
+            amount: totalAmount,
+            date: purchaseForm.date,
+            description: `${description}${invoiceRef}`,
+            reference: purchaseForm.invoiceNumber || "",
+          })
+        } else if (item) {
+          const description = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
+          const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
+          
+          const financeTransaction = addTransaction({
+            type: "expense",
+            category: "Feed Purchase",
+            amount: totalAmount,
+            date: purchaseForm.date,
+            description: `${description}${invoiceRef}`,
+            reference: purchaseForm.invoiceNumber || "",
+          })
+
+          if (financeTransaction) {
+            await supabase
+              .from('purchases')
+              .update({ financeTransactionId: financeTransaction.id })
+              .eq('id', editingPurchaseId)
+          }
+        }
+      } else {
+        // Add new purchase
+        const { data: newPurchase, error: insertError } = await supabase
+          .from('purchases')
+          .insert({
+            date: purchaseForm.date,
+            supplierId: purchaseForm.supplierId,
+            itemId: purchaseForm.itemId,
+            quantity,
+            unitRate,
+            totalAmount,
+            invoiceNumber: purchaseForm.invoiceNumber,
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+
+        // Update item stock and average cost
+        if (item) {
+          const oldValue = item.currentStock * item.averageCost
+          const newValue = quantity * unitRate
+          const newStock = item.currentStock + quantity
+          const newAverageCost = newStock > 0 ? (oldValue + newValue) / newStock : 0
+
+          await supabase
+            .from('inventory')
+            .update({
+              currentStock: newStock,
+              averageCost: newAverageCost,
+            })
+            .eq('id', purchaseForm.itemId)
+        }
+
+        // Create finance expense automatically
+        if (item) {
+          const description = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
+          const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
+          
+          const financeTransaction = addTransaction({
+            type: "expense",
+            category: "Feed Purchase",
+            amount: totalAmount,
+            date: purchaseForm.date,
+            description: `${description}${invoiceRef}`,
+            reference: purchaseForm.invoiceNumber || "",
+          })
+
+          if (newPurchase && financeTransaction) {
+            await supabase
+              .from('purchases')
+              .update({ financeTransactionId: financeTransaction.id })
+              .eq('id', newPurchase.id)
+          }
         }
       }
-    } else {
-      // Add new purchase
-      console.log("[Inventory Page] Adding new purchase:", {
-        date: purchaseForm.date,
-        supplierId: purchaseForm.supplierId,
-        itemId: purchaseForm.itemId,
-        quantity,
-        unitRate,
-        invoiceNumber: purchaseForm.invoiceNumber,
-      })
       
-      const newPurchase = addPurchase({
-        date: purchaseForm.date,
-        supplierId: purchaseForm.supplierId,
-        itemId: purchaseForm.itemId,
-        quantity,
-        unitRate,
-        invoiceNumber: purchaseForm.invoiceNumber,
-      })
-
-      console.log("[Inventory Page] Purchase added, new purchase:", newPurchase)
-      console.log("[Inventory Page] Current purchases from context:", purchases.length)
-
-      // Create finance expense automatically
-      if (item) {
-        const description = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-        const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-        
-        const financeTransaction = addTransaction({
-          type: "expense",
-          category: "Feed Purchase",
-          amount: totalAmount,
-          date: purchaseForm.date,
-          description: `${description}${invoiceRef}`,
-          reference: purchaseForm.invoiceNumber || "",
-        })
-
-        // Link finance transaction to purchase
-        if (newPurchase && financeTransaction) {
-          linkPurchaseToFinance(newPurchase.id, financeTransaction.id)
-        }
-      }
-      
-      // Force a refresh by reading from localStorage
-      setTimeout(() => {
-        const savedPurchases = JSON.parse(localStorage.getItem("poultry_purchases") || "[]")
-        console.log("[Inventory Page] Purchases in localStorage after save:", savedPurchases.length)
-      }, 100)
+      await fetchInventoryData()
+      resetPurchaseForm()
+      setIsPurchaseDialogOpen(false)
+    } catch (error) {
+      console.error('Error saving purchase:', error)
+      alert('Failed to save purchase. Please try again.')
     }
-    resetPurchaseForm()
-    setIsPurchaseDialogOpen(false)
   }
 
   const resetPurchaseForm = () => {
@@ -302,24 +469,16 @@ export default function InventoryPage() {
     setIsPurchaseDialogOpen(true)
   }
 
-  const handleDeletePurchase = (purchase: any) => {
-    console.log("[Purchase Delete] Attempting to delete purchase:", purchase)
-    
+  const handleDeletePurchase = async (purchase: PurchaseEntry) => {
     // Check if purchase is linked to any issues
     const linkedIssues = getIssuesByItem(purchase.itemId)
     const item = getItemById(purchase.itemId)
     
-    console.log("[Purchase Delete] Linked issues:", linkedIssues.length)
-    console.log("[Purchase Delete] Item:", item)
-    
     if (linkedIssues.length > 0) {
-      // Check if any issues occurred after this purchase date
       const purchaseDate = new Date(purchase.date)
       const issuesAfterPurchase = linkedIssues.filter(
         (issue) => new Date(issue.date) >= purchaseDate
       )
-      
-      console.log("[Purchase Delete] Issues after purchase date:", issuesAfterPurchase.length)
       
       if (issuesAfterPurchase.length > 0) {
         alert(
@@ -338,30 +497,41 @@ export default function InventoryPage() {
     const confirmMessage = `Delete this purchase?\n\nStock will decrease by ${quantity} ${unit}.\n\nItem: ${itemName}`
 
     if (confirm(confirmMessage)) {
-      console.log("[Purchase Delete] Confirmed, calling deletePurchase with id:", purchase.id)
-      console.log("[Purchase Delete] Finance transaction ID:", purchase.financeTransactionId)
-      
-      // Delete linked finance transaction FIRST if it exists
-      if (purchase.financeTransactionId) {
-        console.log("[Purchase Delete] Deleting finance transaction:", purchase.financeTransactionId)
-        deleteTransaction(purchase.financeTransactionId)
-        console.log("[Purchase Delete] Finance transaction deleted")
+      try {
+        // Delete linked finance transaction FIRST if it exists
+        if (purchase.financeTransactionId) {
+          deleteTransaction(purchase.financeTransactionId)
+        }
         
-        // Verify deletion
-        setTimeout(() => {
-          const transactionsAfterDelete = JSON.parse(localStorage.getItem("poultry_transactions") || "[]")
-          const transactionExists = transactionsAfterDelete.some((t: any) => t.id === purchase.financeTransactionId)
-          console.log("[Purchase Delete] Transaction still exists after delete:", transactionExists)
-          if (transactionExists) {
-            console.error("[Purchase Delete] ERROR: Finance transaction was not deleted!")
-          }
-        }, 100)
+        // Reverse stock impact
+        if (item) {
+          const oldStock = item.currentStock - purchase.quantity
+          const oldValue = item.currentStock * item.averageCost
+          const purchaseValue = purchase.quantity * purchase.unitRate
+          const oldTotalValue = oldValue - purchaseValue
+          const oldAverageCost = oldStock > 0 ? oldTotalValue / oldStock : item.averageCost
+
+          await supabase
+            .from('inventory')
+            .update({
+              currentStock: Math.max(0, oldStock),
+              averageCost: Math.max(0, oldAverageCost),
+            })
+            .eq('id', purchase.itemId)
+        }
+        
+        // Delete purchase
+        const { error } = await supabase
+          .from('purchases')
+          .delete()
+          .eq('id', purchase.id)
+
+        if (error) throw error
+        await fetchInventoryData()
+      } catch (error) {
+        console.error('Error deleting purchase:', error)
+        alert('Failed to delete purchase. Please try again.')
       }
-      
-      deletePurchase(purchase.id)
-      console.log("[Purchase Delete] deletePurchase called")
-    } else {
-      console.log("[Purchase Delete] Delete cancelled by user")
     }
   }
 
