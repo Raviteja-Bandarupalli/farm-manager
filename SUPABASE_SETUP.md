@@ -5,7 +5,7 @@
 Go to your Supabase dashboard → SQL Editor and run these commands:
 
 ### Sales Table
-```sql
+\`\`\`sql
 CREATE TABLE IF NOT EXISTS sales (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
@@ -25,10 +25,10 @@ CREATE TABLE IF NOT EXISTS sales (
 ALTER TABLE sales DISABLE ROW LEVEL SECURITY;
 -- OR if RLS is enabled:
 -- CREATE POLICY "Allow all" ON sales FOR ALL USING (true) WITH CHECK (true);
-```
+\`\`\`
 
 ### Inventory Table
-```sql
+\`\`\`sql
 CREATE TABLE IF NOT EXISTS inventory (
   id TEXT PRIMARY KEY,
   code TEXT NOT NULL,
@@ -44,10 +44,10 @@ CREATE TABLE IF NOT EXISTS inventory (
 );
 
 ALTER TABLE inventory DISABLE ROW LEVEL SECURITY;
-```
+\`\`\`
 
 ### Purchases Table
-```sql
+\`\`\`sql
 CREATE TABLE IF NOT EXISTS purchases (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
@@ -62,10 +62,10 @@ CREATE TABLE IF NOT EXISTS purchases (
 );
 
 ALTER TABLE purchases DISABLE ROW LEVEL SECURITY;
-```
+\`\`\`
 
 ### Daily Logs Table
-```sql
+\`\`\`sql
 CREATE TABLE IF NOT EXISTS daily_logs (
   id TEXT PRIMARY KEY,
   "batchId" TEXT NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS daily_logs (
 );
 
 ALTER TABLE daily_logs DISABLE ROW LEVEL SECURITY;
-```
+\`\`\`
 
 ## Step 2: Verify Tables
 

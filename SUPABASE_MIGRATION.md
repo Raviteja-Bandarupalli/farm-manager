@@ -3,7 +3,7 @@
 ## Tables Required in Supabase
 
 ### 1. `sales` table
-```sql
+\`\`\`sql
 CREATE TABLE sales (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
@@ -23,10 +23,10 @@ CREATE TABLE sales (
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 -- Or create a policy that allows all operations
 CREATE POLICY "Allow all operations on sales" ON sales FOR ALL USING (true) WITH CHECK (true);
-```
+\`\`\`
 
 ### 2. `inventory` table
-```sql
+\`\`\`sql
 CREATE TABLE inventory (
   id TEXT PRIMARY KEY,
   code TEXT NOT NULL,
@@ -40,10 +40,10 @@ CREATE TABLE inventory (
   reorderLevel DECIMAL(10,2) NOT NULL,
   createdAt TIMESTAMP DEFAULT NOW()
 );
-```
+\`\`\`
 
 ### 3. `purchases` table
-```sql
+\`\`\`sql
 CREATE TABLE purchases (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
@@ -56,10 +56,10 @@ CREATE TABLE purchases (
   financeTransactionId TEXT,
   createdAt TIMESTAMP DEFAULT NOW()
 );
-```
+\`\`\`
 
 ### 4. `issues` table (for inventory consumption)
-```sql
+\`\`\`sql
 CREATE TABLE issues (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
@@ -71,10 +71,10 @@ CREATE TABLE issues (
   purpose TEXT,
   createdAt TIMESTAMP DEFAULT NOW()
 );
-```
+\`\`\`
 
 ### 5. `daily_logs` table
-```sql
+\`\`\`sql
 CREATE TABLE daily_logs (
   id TEXT PRIMARY KEY,
   batchId TEXT NOT NULL,
@@ -95,7 +95,7 @@ CREATE TABLE daily_logs (
   remarks TEXT,
   createdAt TIMESTAMP DEFAULT NOW()
 );
-```
+\`\`\`
 
 ## Migration Status
 
