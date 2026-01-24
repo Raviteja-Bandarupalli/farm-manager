@@ -4,52 +4,13 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { supabase } from "@/lib/supabase"
 import { useMasterData } from "@/lib/master-data-context"
 import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
+import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry } from "@/lib/inventory-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
-
-interface InventoryItem {
-  id: string
-  code: string
-  name: string
-  category: string
-  unit: string
-  openingStock: number
-  openingValue: number
-  currentStock: number
-  averageCost: number
-  reorderLevel: number
-  createdAt: string
-}
-
-interface PurchaseEntry {
-  id: string
-  date: string
-  supplierId: string
-  itemId: string
-  quantity: number
-  unitRate: number
-  totalAmount: number
-  invoiceNumber: string
-  financeTransactionId?: string
-  createdAt: string
-}
-
-interface IssueEntry {
-  id: string
-  date: string
-  batchId: string
-  itemId: string
-  quantity: number
-  costPerUnit: number
-  totalCost: number
-  purpose: string
-  createdAt: string
-}
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -92,12 +53,25 @@ export default function InventoryPage() {
   const { suppliers, houses, farms } = useMasterData()
   const { batches } = useBatch()
   const { user } = useAuth()
-  const { addTransaction, updateTransaction, deleteTransaction, transactions } = useFinance()
-
-  const [items, setItems] = useState<InventoryItem[]>([])
-  const [purchases, setPurchases] = useState<PurchaseEntry[]>([])
-  const [issues, setIssues] = useState<IssueEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const { addTransaction, updateTransaction, deleteTransaction } = useFinance()
+  const {
+    items,
+    purchases,
+    issues,
+    loading,
+    addItem,
+    updateItem,
+    deleteItem,
+    addPurchase,
+    updatePurchase,
+    deletePurchase,
+    linkPurchaseToFinance,
+    addIssue,
+    getItemById,
+    getPurchaseById,
+    getIssuesByItem,
+    getLowStockItems,
+  } = useInventory()
 
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false)
@@ -132,108 +106,33 @@ export default function InventoryPage() {
     purpose: "",
   })
 
-  // Fetch data from Supabase
-  useEffect(() => {
-    fetchInventoryData()
-  }, [])
-
-  const fetchInventoryData = async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('inventory')
-        .select('*')
-        .order('code')
-      
-      if (itemsError) throw itemsError
-      
-      // Fetch purchases - assuming there's a 'purchases' table
-      const { data: purchasesData, error: purchasesError } = await supabase
-        .from('purchases')
-        .select('*')
-        .order('date', { ascending: false })
-      
-      if (purchasesError && purchasesError.code !== 'PGRST116') {
-        console.warn('Purchases table error:', purchasesError)
-      }
-      
-      // Note: Issues might need a separate table or be part of inventory
-      // For now, we'll fetch from a potential 'issues' table
-      const { data: issuesData, error: issuesError } = await supabase
-        .from('issues')
-        .select('*')
-        .order('date', { ascending: false })
-      
-      if (issuesError && issuesError.code !== 'PGRST116') {
-        // PGRST116 = table doesn't exist, which is OK for now
-        console.warn('Issues table not found:', issuesError)
-      }
-      
-      setItems(itemsData || [])
-      setPurchases(purchasesData || [])
-      setIssues(issuesData || [])
-    } catch (error) {
-      console.error('Error fetching inventory data:', error)
-      alert('Failed to load inventory data')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Helper functions
-  const getItemById = (id: string) => items.find(i => i.id === id)
-  const getIssuesByItem = (itemId: string) => issues.filter(i => i.itemId === itemId)
-  const getPurchaseById = (id: string) => purchases.find(p => p.id === id)
-  const getLowStockItems = () => items.filter(item => item.currentStock <= item.reorderLevel)
-
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const openingStock = Number.parseFloat(itemForm.openingStock)
-      const openingValue = Number.parseFloat(itemForm.openingValue)
-      const averageCost = openingStock > 0 ? openingValue / openingStock : 0
-
       if (editingItemId) {
-        // Update existing item
-        const { error } = await supabase
-          .from('inventory')
-          .update({
-            code: itemForm.code,
-            name: itemForm.name,
-            category: itemForm.category,
-            unit: itemForm.unit,
-            reorderLevel: Number.parseFloat(itemForm.reorderLevel),
-          })
-          .eq('id', editingItemId)
-
-        if (error) throw error
+        await updateItem(editingItemId, {
+          code: itemForm.code,
+          name: itemForm.name,
+          category: itemForm.category,
+          unit: itemForm.unit,
+          reorderLevel: Number.parseFloat(itemForm.reorderLevel),
+        })
       } else {
-        // Add new item
-        const { error } = await supabase
-          .from('inventory')
-          .insert({
-            code: itemForm.code,
-            name: itemForm.name,
-            category: itemForm.category,
-            unit: itemForm.unit,
-            openingStock,
-            openingValue,
-            currentStock: openingStock,
-            averageCost,
-            reorderLevel: Number.parseFloat(itemForm.reorderLevel),
-          })
-
-        if (error) throw error
+        await addItem({
+          code: itemForm.code,
+          name: itemForm.name,
+          category: itemForm.category,
+          unit: itemForm.unit,
+          openingStock: Number.parseFloat(itemForm.openingStock),
+          openingValue: Number.parseFloat(itemForm.openingValue),
+          reorderLevel: Number.parseFloat(itemForm.reorderLevel),
+        })
       }
-      
-      await fetchInventoryData()
       resetItemForm()
       setIsItemDialogOpen(false)
-    } catch (error) {
-      console.error('Error saving item:', error)
-      alert('Failed to save item. Please try again.')
+    } catch (err) {
+      console.error("Error saving item:", err)
+      alert(err instanceof Error ? err.message : "Failed to save item.")
     }
   }
 
@@ -279,16 +178,10 @@ export default function InventoryPage() {
 
     if (confirm(confirmMessage)) {
       try {
-        const { error } = await supabase
-          .from('inventory')
-          .delete()
-          .eq('id', item.id)
-
-        if (error) throw error
-        await fetchInventoryData()
-      } catch (error) {
-        console.error('Error deleting item:', error)
-        alert('Failed to delete item. Please try again.')
+        await deleteItem(item.id)
+      } catch (err) {
+        console.error("Error deleting item:", err)
+        alert("Failed to delete item.")
       }
     }
   }
@@ -302,145 +195,72 @@ export default function InventoryPage() {
     e.preventDefault()
     const quantity = Number.parseFloat(purchaseForm.quantity)
     const unitRate = Number.parseFloat(purchaseForm.unitRate)
-    const totalAmount = quantity * unitRate
     const item = getItemById(purchaseForm.itemId)
-    const supplier = suppliers.find((s) => s.id === purchaseForm.supplierId)
-    
     try {
       if (editingPurchaseId) {
-        // Update existing purchase
-        const existingPurchase = getPurchaseById(editingPurchaseId)
-        if (!existingPurchase) return
-
-        const { error: updateError } = await supabase
-          .from('purchases')
-          .update({
-            date: purchaseForm.date,
-            supplierId: purchaseForm.supplierId,
-            itemId: purchaseForm.itemId,
-            quantity,
-            unitRate,
-            totalAmount,
-            invoiceNumber: purchaseForm.invoiceNumber,
-          })
-          .eq('id', editingPurchaseId)
-
-        if (updateError) throw updateError
-
-        // Update item stock and average cost
-        if (item) {
-          const oldValue = item.currentStock * item.averageCost
-          const newValue = quantity * unitRate
-          const newStock = item.currentStock + quantity
-          const newAverageCost = newStock > 0 ? (oldValue + newValue) / newStock : 0
-
-          await supabase
-            .from('inventory')
-            .update({
-              currentStock: newStock,
-              averageCost: newAverageCost,
-            })
-            .eq('id', purchaseForm.itemId)
-        }
-
-        // Update or create finance expense
-        if (existingPurchase.financeTransactionId) {
-          const description = item 
-            ? `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-            : `Purchase ${quantity.toFixed(0)} units`
-          const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-          
-          updateTransaction(existingPurchase.financeTransactionId, {
+        const existing = getPurchaseById(editingPurchaseId)
+        if (!existing) return
+        await updatePurchase(editingPurchaseId, {
+          date: purchaseForm.date,
+          supplierId: purchaseForm.supplierId,
+          itemId: purchaseForm.itemId,
+          quantity,
+          unitRate,
+          invoiceNumber: purchaseForm.invoiceNumber,
+        })
+        const totalAmount = quantity * unitRate
+        if (existing.financeTransactionId) {
+          const desc = item ? `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}` : `Purchase ${quantity.toFixed(0)} units`
+          const ref = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
+          await updateTransaction(existing.financeTransactionId, {
             type: "expense",
             category: "Feed Purchase",
             amount: totalAmount,
             date: purchaseForm.date,
-            description: `${description}${invoiceRef}`,
+            description: `${desc}${ref}`,
             reference: purchaseForm.invoiceNumber || "",
           })
         } else if (item) {
-          const description = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-          const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-          
-          const financeTransaction = addTransaction({
+          const desc = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
+          const ref = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
+          const tx = await addTransaction({
             type: "expense",
             category: "Feed Purchase",
-            amount: totalAmount,
+            amount: quantity * unitRate,
             date: purchaseForm.date,
-            description: `${description}${invoiceRef}`,
+            description: `${desc}${ref}`,
             reference: purchaseForm.invoiceNumber || "",
           })
-
-          if (financeTransaction) {
-            await supabase
-              .from('purchases')
-              .update({ financeTransactionId: financeTransaction.id })
-              .eq('id', editingPurchaseId)
-          }
+          if (tx) await linkPurchaseToFinance(editingPurchaseId, tx.id)
         }
       } else {
-        // Add new purchase
-        const { data: newPurchase, error: insertError } = await supabase
-          .from('purchases')
-          .insert({
-            date: purchaseForm.date,
-            supplierId: purchaseForm.supplierId,
-            itemId: purchaseForm.itemId,
-            quantity,
-            unitRate,
-            totalAmount,
-            invoiceNumber: purchaseForm.invoiceNumber,
-          })
-          .select()
-          .single()
-
-        if (insertError) throw insertError
-
-        // Update item stock and average cost
-        if (item) {
-          const oldValue = item.currentStock * item.averageCost
-          const newValue = quantity * unitRate
-          const newStock = item.currentStock + quantity
-          const newAverageCost = newStock > 0 ? (oldValue + newValue) / newStock : 0
-
-          await supabase
-            .from('inventory')
-            .update({
-              currentStock: newStock,
-              averageCost: newAverageCost,
-            })
-            .eq('id', purchaseForm.itemId)
-        }
-
-        // Create finance expense automatically
-        if (item) {
-          const description = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-          const invoiceRef = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-          
-          const financeTransaction = addTransaction({
+        const newPurchase = await addPurchase({
+          date: purchaseForm.date,
+          supplierId: purchaseForm.supplierId,
+          itemId: purchaseForm.itemId,
+          quantity,
+          unitRate,
+          invoiceNumber: purchaseForm.invoiceNumber,
+        })
+        if (item && newPurchase) {
+          const desc = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
+          const ref = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
+          const tx = await addTransaction({
             type: "expense",
             category: "Feed Purchase",
-            amount: totalAmount,
+            amount: newPurchase.totalAmount,
             date: purchaseForm.date,
-            description: `${description}${invoiceRef}`,
+            description: `${desc}${ref}`,
             reference: purchaseForm.invoiceNumber || "",
           })
-
-          if (newPurchase && financeTransaction) {
-            await supabase
-              .from('purchases')
-              .update({ financeTransactionId: financeTransaction.id })
-              .eq('id', newPurchase.id)
-          }
+          if (tx) await linkPurchaseToFinance(newPurchase.id, tx.id)
         }
       }
-      
-      await fetchInventoryData()
       resetPurchaseForm()
       setIsPurchaseDialogOpen(false)
-    } catch (error) {
-      console.error('Error saving purchase:', error)
-      alert('Failed to save purchase. Please try again.')
+    } catch (err) {
+      console.error("Error saving purchase:", err)
+      alert(err instanceof Error ? err.message : "Failed to save purchase.")
     }
   }
 
@@ -470,68 +290,26 @@ export default function InventoryPage() {
   }
 
   const handleDeletePurchase = async (purchase: PurchaseEntry) => {
-    // Check if purchase is linked to any issues
     const linkedIssues = getIssuesByItem(purchase.itemId)
     const item = getItemById(purchase.itemId)
-    
     if (linkedIssues.length > 0) {
       const purchaseDate = new Date(purchase.date)
-      const issuesAfterPurchase = linkedIssues.filter(
-        (issue) => new Date(issue.date) >= purchaseDate
-      )
-      
-      if (issuesAfterPurchase.length > 0) {
-        alert(
-          `Cannot delete this purchase. It is linked to ${issuesAfterPurchase.length} issue/consumption record(s) that occurred on or after the purchase date.`
-        )
+      const after = linkedIssues.filter((i) => new Date(i.date) >= purchaseDate)
+      if (after.length > 0) {
+        alert(`Cannot delete this purchase. It is linked to ${after.length} issue/consumption record(s) that occurred on or after the purchase date.`)
         return
       }
     }
-
     const itemName = item ? `${item.code} - ${item.name}` : "this item"
-    const quantity = typeof purchase.quantity === 'number' 
-      ? purchase.quantity.toFixed(2) 
-      : Number.parseFloat(String(purchase.quantity)).toFixed(2)
+    const qty = typeof purchase.quantity === "number" ? purchase.quantity.toFixed(2) : Number.parseFloat(String(purchase.quantity)).toFixed(2)
     const unit = item?.unit || ""
-
-    const confirmMessage = `Delete this purchase?\n\nStock will decrease by ${quantity} ${unit}.\n\nItem: ${itemName}`
-
-    if (confirm(confirmMessage)) {
-      try {
-        // Delete linked finance transaction FIRST if it exists
-        if (purchase.financeTransactionId) {
-          deleteTransaction(purchase.financeTransactionId)
-        }
-        
-        // Reverse stock impact
-        if (item) {
-          const oldStock = item.currentStock - purchase.quantity
-          const oldValue = item.currentStock * item.averageCost
-          const purchaseValue = purchase.quantity * purchase.unitRate
-          const oldTotalValue = oldValue - purchaseValue
-          const oldAverageCost = oldStock > 0 ? oldTotalValue / oldStock : item.averageCost
-
-          await supabase
-            .from('inventory')
-            .update({
-              currentStock: Math.max(0, oldStock),
-              averageCost: Math.max(0, oldAverageCost),
-            })
-            .eq('id', purchase.itemId)
-        }
-        
-        // Delete purchase
-        const { error } = await supabase
-          .from('purchases')
-          .delete()
-          .eq('id', purchase.id)
-
-        if (error) throw error
-        await fetchInventoryData()
-      } catch (error) {
-        console.error('Error deleting purchase:', error)
-        alert('Failed to delete purchase. Please try again.')
-      }
+    if (!confirm(`Delete this purchase?\n\nStock will decrease by ${qty} ${unit}.\n\nItem: ${itemName}`)) return
+    try {
+      if (purchase.financeTransactionId) await deleteTransaction(purchase.financeTransactionId)
+      await deletePurchase(purchase.id)
+    } catch (err) {
+      console.error("Error deleting purchase:", err)
+      alert("Failed to delete purchase.")
     }
   }
 
@@ -540,62 +318,61 @@ export default function InventoryPage() {
     setIsPurchaseDialogOpen(true)
   }
 
-  // Backfill function: Create finance expenses for existing purchases that don't have them
-  const syncExistingPurchasesToFinance = () => {
-    const purchasesWithoutFinance = purchases.filter((p) => !p.financeTransactionId)
-    
-    if (purchasesWithoutFinance.length === 0) {
+  const syncExistingPurchasesToFinance = async () => {
+    const without = purchases.filter((p) => !p.financeTransactionId)
+    if (without.length === 0) {
       alert("All purchases are already synced with finance!")
       return
     }
-
-    if (!confirm(`This will create ${purchasesWithoutFinance.length} finance expense(s) for existing purchases. Continue?`)) {
-      return
-    }
-
-    let syncedCount = 0
-    purchasesWithoutFinance.forEach((purchase) => {
-      const item = getItemById(purchase.itemId)
-      if (item) {
-        const description = `${item.code} ${item.name} ${purchase.quantity.toFixed(0)}${item.unit}`
-        const invoiceRef = purchase.invoiceNumber ? ` INV-${purchase.invoiceNumber}` : ""
-        
-        const financeTransaction = addTransaction({
+    if (!confirm(`This will create ${without.length} finance expense(s) for existing purchases. Continue?`)) return
+    let synced = 0
+    for (const p of without) {
+      const item = getItemById(p.itemId)
+      if (!item) continue
+      try {
+        const desc = `${item.code} ${item.name} ${p.quantity.toFixed(0)}${item.unit}`
+        const ref = p.invoiceNumber ? ` INV-${p.invoiceNumber}` : ""
+        const tx = await addTransaction({
           type: "expense",
           category: "Feed Purchase",
-          amount: purchase.totalAmount,
-          date: purchase.date,
-          description: `${description}${invoiceRef}`,
-          reference: purchase.invoiceNumber || "",
+          amount: p.totalAmount,
+          date: p.date,
+          description: `${desc}${ref}`,
+          reference: p.invoiceNumber || "",
         })
-
-        if (financeTransaction) {
-          linkPurchaseToFinance(purchase.id, financeTransaction.id)
-          syncedCount++
+        if (tx) {
+          await linkPurchaseToFinance(p.id, tx.id)
+          synced++
         }
+      } catch (e) {
+        console.error("Sync purchase failed:", e)
       }
-    })
-
-    alert(`Successfully synced ${syncedCount} purchase(s) with finance expenses!`)
+    }
+    alert(`Successfully synced ${synced} purchase(s) with finance expenses!`)
   }
 
-  const handleAddIssue = (e: React.FormEvent) => {
+  const handleAddIssue = async (e: React.FormEvent) => {
     e.preventDefault()
-    addIssue({
-      date: issueForm.date,
-      batchId: issueForm.batchId,
-      itemId: issueForm.itemId,
-      quantity: Number.parseFloat(issueForm.quantity),
-      purpose: issueForm.purpose,
-    })
-    setIssueForm({
-      date: getTodayDate(),
-      batchId: "",
-      itemId: "",
-      quantity: "",
-      purpose: "",
-    })
-    setIsIssueDialogOpen(false)
+    try {
+      await addIssue({
+        date: issueForm.date,
+        batchId: issueForm.batchId,
+        itemId: issueForm.itemId,
+        quantity: Number.parseFloat(issueForm.quantity),
+        purpose: issueForm.purpose,
+      })
+      setIssueForm({
+        date: getTodayDate(),
+        batchId: "",
+        itemId: "",
+        quantity: "",
+        purpose: "",
+      })
+      setIsIssueDialogOpen(false)
+    } catch (err) {
+      console.error("Error adding issue:", err)
+      alert(err instanceof Error ? err.message : "Failed to add issue.")
+    }
   }
 
   const lowStockItems = getLowStockItems()

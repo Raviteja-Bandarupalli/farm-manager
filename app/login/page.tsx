@@ -31,7 +31,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+    <div className="min-h-screen relative flex flex-col items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <Link
+        href="/"
+        className="absolute top-4 left-4 text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+      >
+        ← Back to homepage
+      </Link>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -79,7 +85,7 @@ export default function LoginPage() {
           </form>
           <div className="mt-4 text-center">
             <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Back to home
+              ← Return to homepage
             </Link>
           </div>
         </CardContent>

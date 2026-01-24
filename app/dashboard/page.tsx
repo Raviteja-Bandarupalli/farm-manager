@@ -154,7 +154,7 @@ export default function DashboardPage() {
   })
 
   const totalMortality = recentLogs.reduce((sum, log) => sum + log.mortality, 0)
-  const totalFeedConsumed = recentLogs.reduce((sum, log) => sum + log.feedGiven, 0)
+  const totalFeedConsumed = recentLogs.reduce((sum, log) => sum + (log.cumulativeFeed ?? 0), 0)
 
   const activeHouses = houses.filter((h) => h.status === "active").length
 

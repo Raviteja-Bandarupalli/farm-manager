@@ -34,7 +34,9 @@ git push --force-with-lease origin main
    - Open your Farm Manager project → Deployments  
    - Wait for new build (triggered by push) → status **Ready**
 
-2. **Live URL** – https://poultry-farm.vercel.app (or your project URL)
+2. **Live URL (public starting page)** – **https://poultry-farm.vercel.app**  
+   - Use this as the main link for the app. Visitors see the **homepage** (Hero, Features, etc.) first.  
+   - **Do not** use `.../login` as the app’s entry link. Login is only for “Sign In” from the homepage.
 
 3. **Smoke test**
    - Login → Dashboard matches local

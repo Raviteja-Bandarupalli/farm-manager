@@ -69,29 +69,34 @@ export default function FinancePage() {
     reference: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (editingId) {
-      updateTransaction(editingId, {
-        ...formData,
-        amount: Number.parseFloat(formData.amount),
+    try {
+      if (editingId) {
+        await updateTransaction(editingId, {
+          ...formData,
+          amount: Number.parseFloat(formData.amount),
+        })
+      } else {
+        await addTransaction({
+          ...formData,
+          amount: Number.parseFloat(formData.amount),
+        })
+      }
+      setFormData({
+        type: "income",
+        category: "",
+        amount: "",
+        date: getTodayDate(),
+        description: "",
+        reference: "",
       })
-    } else {
-      addTransaction({
-        ...formData,
-        amount: Number.parseFloat(formData.amount),
-      })
+      setEditingId(null)
+      setIsDialogOpen(false)
+    } catch (err) {
+      console.error("Error saving transaction:", err)
+      alert(err instanceof Error ? err.message : "Failed to save transaction.")
     }
-    setFormData({
-      type: "income",
-      category: "",
-      amount: "",
-      date: getTodayDate(),
-      description: "",
-      reference: "",
-    })
-    setEditingId(null)
-    setIsDialogOpen(false)
   }
 
   const handleEdit = (transaction: any) => {
@@ -107,9 +112,13 @@ export default function FinancePage() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this transaction?")) {
-      deleteTransaction(id)
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this transaction?")) return
+    try {
+      await deleteTransaction(id)
+    } catch (err) {
+      console.error("Error deleting transaction:", err)
+      alert("Failed to delete transaction.")
     }
   }
 

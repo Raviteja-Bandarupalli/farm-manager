@@ -1,95 +1,92 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { logFetchError } from "@/lib/supabase-errors"
 
 export interface BatchSection {
   id: string
   batchId: string
-  name: string // e.g. "Durga side", "Surayya side"
-  workerId?: string // link to Worker (optional for now)
+  name: string
+  workerId?: string
   initialBirds: number
   createdAt: string
 }
 
 interface BatchSectionsContextType {
   sections: BatchSection[]
+  loading: boolean
+  refetch: () => Promise<void>
   getSectionsByBatch: (batchId: string) => BatchSection[]
-  addSection: (section: Omit<BatchSection, "id" | "createdAt">) => BatchSection
-  updateSection: (id: string, section: Partial<BatchSection>) => void
-  deleteSection: (id: string) => void
-  deleteSectionsByBatch: (batchId: string) => void
+  addSection: (section: Omit<BatchSection, "id" | "createdAt">) => Promise<BatchSection>
+  updateSection: (id: string, section: Partial<BatchSection>) => Promise<void>
+  deleteSection: (id: string) => Promise<void>
+  deleteSectionsByBatch: (batchId: string) => Promise<void>
 }
 
 const BatchSectionsContext = createContext<BatchSectionsContextType | undefined>(undefined)
 
 export function BatchSectionsProvider({ children }: { children: React.ReactNode }) {
   const [sections, setSections] = useState<BatchSection[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const storedSections = localStorage.getItem("poultry_batch_sections")
-    console.log("[v0] BatchSectionsProvider - Loading sections from localStorage")
-    console.log("[v0] Raw localStorage value:", storedSections)
-    if (storedSections) {
-      const parsed = JSON.parse(storedSections)
-      console.log("[v0] Parsed sections:", parsed)
-      console.log("[v0] Number of sections loaded:", parsed.length)
-      setSections(parsed)
-    } else {
-      console.log("[v0] No sections found in localStorage")
+  const fetchSections = useCallback(async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase.from("batch_sections").select("*")
+      if (error) throw error
+      setSections((data as BatchSection[]) || [])
+    } catch (e) {
+      logFetchError("batch_sections", e)
+      setSections([])
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  const getSectionsByBatch = (batchId: string) => {
-    const filtered = sections.filter((s) => s.batchId === batchId)
-    console.log(`[v0] getSectionsByBatch(${batchId}):`, filtered)
-    return filtered
-  }
+  useEffect(() => {
+    fetchSections()
+  }, [fetchSections])
 
-  const addSection = (section: Omit<BatchSection, "id" | "createdAt">) => {
-    const newSection: BatchSection = {
+  const getSectionsByBatch = (batchId: string) => sections.filter((s) => s.batchId === batchId)
+
+  const addSection = async (section: Omit<BatchSection, "id" | "createdAt">): Promise<BatchSection> => {
+    const row = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
       ...section,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       createdAt: new Date().toISOString(),
     }
-    // Read current sections from localStorage to ensure we have the latest state
-    const currentSections = JSON.parse(localStorage.getItem("poultry_batch_sections") || "[]")
-    const updatedSections = [...currentSections, newSection]
-    console.log("[v0] Adding section:", newSection)
-    console.log("[v0] Current sections count:", currentSections.length)
-    console.log("[v0] Total sections after add:", updatedSections.length)
-    setSections(updatedSections)
-    localStorage.setItem("poultry_batch_sections", JSON.stringify(updatedSections))
-    return newSection
+    const { data, error } = await supabase.from("batch_sections").insert(row).select().single()
+    if (error) throw error
+    await fetchSections()
+    return data as BatchSection
   }
 
-  const updateSection = (id: string, section: Partial<BatchSection>) => {
-    const updatedSections = sections.map((s) => (s.id === id ? { ...s, ...section } : s))
-    setSections(updatedSections)
-    localStorage.setItem("poultry_batch_sections", JSON.stringify(updatedSections))
+  const updateSection = async (id: string, section: Partial<BatchSection>) => {
+    const { error } = await supabase.from("batch_sections").update(section).eq("id", id)
+    if (error) throw error
+    await fetchSections()
   }
 
-  const deleteSection = (id: string) => {
-    const updatedSections = sections.filter((s) => s.id !== id)
-    setSections(updatedSections)
-    localStorage.setItem("poultry_batch_sections", JSON.stringify(updatedSections))
+  const deleteSection = async (id: string) => {
+    const { error } = await supabase.from("batch_sections").delete().eq("id", id)
+    if (error) throw error
+    await fetchSections()
   }
 
-  const deleteSectionsByBatch = (batchId: string) => {
-    // Read current sections from localStorage to ensure we have the latest state
-    const currentSections = JSON.parse(localStorage.getItem("poultry_batch_sections") || "[]")
-    const updatedSections = currentSections.filter((s: BatchSection) => s.batchId !== batchId)
-    console.log(`[v0] Deleting sections for batch ${batchId}`)
-    console.log(`[v0] Sections before delete:`, currentSections.length)
-    console.log(`[v0] Sections after delete:`, updatedSections.length)
-    setSections(updatedSections)
-    localStorage.setItem("poultry_batch_sections", JSON.stringify(updatedSections))
+  const deleteSectionsByBatch = async (batchId: string) => {
+    const { error } = await supabase.from("batch_sections").delete().eq("batchId", batchId)
+    if (error) throw error
+    await fetchSections()
   }
 
   return (
     <BatchSectionsContext.Provider
       value={{
         sections,
+        loading,
+        refetch: fetchSections,
         getSectionsByBatch,
         addSection,
         updateSection,
@@ -103,9 +100,7 @@ export function BatchSectionsProvider({ children }: { children: React.ReactNode 
 }
 
 export function useBatchSections() {
-  const context = useContext(BatchSectionsContext)
-  if (context === undefined) {
-    throw new Error("useBatchSections must be used within a BatchSectionsProvider")
-  }
-  return context
+  const ctx = useContext(BatchSectionsContext)
+  if (ctx === undefined) throw new Error("useBatchSections must be used within a BatchSectionsProvider")
+  return ctx
 }

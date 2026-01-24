@@ -1,89 +1,99 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { logFetchError } from "@/lib/supabase-errors"
 
 export interface WeeklyFeedLog {
   id: string
   batchId: string
   houseId: string
-  weekStart: string // ISO date
-  weekEnd: string // ISO date
+  weekStart: string
+  weekEnd: string
   totalFeedKg: number
-  averageWeightKg: number // <-- New field for weekly weight recording
+  averageWeightKg: number
   createdAt: string
 }
 
 interface WeeklyFeedContextType {
   weeklyFeeds: WeeklyFeedLog[]
-  addWeeklyFeed: (feed: Omit<WeeklyFeedLog, "id" | "createdAt">) => void
-  updateWeeklyFeed: (id: string, feed: Partial<WeeklyFeedLog>) => void
-  deleteWeeklyFeed: (id: string) => void
+  loading: boolean
+  refetch: () => Promise<void>
+  addWeeklyFeed: (feed: Omit<WeeklyFeedLog, "id" | "createdAt">) => Promise<void>
+  updateWeeklyFeed: (id: string, feed: Partial<WeeklyFeedLog>) => Promise<void>
+  deleteWeeklyFeed: (id: string) => Promise<void>
   getFeedsByBatch: (batchId: string) => WeeklyFeedLog[]
   getTotalFeedForBatch: (batchId: string, upToDate?: string) => number
-  getLatestWeightForBatch: (batchId: string, upToDate?: string) => number // <-- New function to retrieve most recent weight
+  getLatestWeightForBatch: (batchId: string, upToDate?: string) => number
 }
 
 const WeeklyFeedContext = createContext<WeeklyFeedContextType | undefined>(undefined)
 
 export function WeeklyFeedProvider({ children }: { children: React.ReactNode }) {
   const [weeklyFeeds, setWeeklyFeeds] = useState<WeeklyFeedLog[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const stored = localStorage.getItem("poultry_weekly_feeds")
-    if (stored) {
-      setWeeklyFeeds(JSON.parse(stored))
+  const fetchFeeds = useCallback(async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase.from("weekly_feeds").select("*").order("weekStart")
+      if (error) throw error
+      setWeeklyFeeds((data as WeeklyFeedLog[]) || [])
+    } catch (e) {
+      logFetchError("weekly_feeds", e)
+      setWeeklyFeeds([])
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  const addWeeklyFeed = (feed: Omit<WeeklyFeedLog, "id" | "createdAt">) => {
-    const newFeed: WeeklyFeedLog = {
-      ...feed,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    }
+  useEffect(() => {
+    fetchFeeds()
+  }, [fetchFeeds])
 
-    const updated = [...weeklyFeeds, newFeed]
-    setWeeklyFeeds(updated)
-    localStorage.setItem("poultry_weekly_feeds", JSON.stringify(updated))
+  const addWeeklyFeed = async (feed: Omit<WeeklyFeedLog, "id" | "createdAt">) => {
+    const row = { id: Date.now().toString(), ...feed, createdAt: new Date().toISOString() }
+    const { error } = await supabase.from("weekly_feeds").insert(row)
+    if (error) throw error
+    await fetchFeeds()
   }
 
-  const updateWeeklyFeed = (id: string, updates: Partial<WeeklyFeedLog>) => {
-    const updated = weeklyFeeds.map((f) => (f.id === id ? { ...f, ...updates } : f))
-    setWeeklyFeeds(updated)
-    localStorage.setItem("poultry_weekly_feeds", JSON.stringify(updated))
+  const updateWeeklyFeed = async (id: string, feed: Partial<WeeklyFeedLog>) => {
+    const { error } = await supabase.from("weekly_feeds").update(feed).eq("id", id)
+    if (error) throw error
+    await fetchFeeds()
   }
 
-  const deleteWeeklyFeed = (id: string) => {
-    const updated = weeklyFeeds.filter((f) => f.id !== id)
-    setWeeklyFeeds(updated)
-    localStorage.setItem("poultry_weekly_feeds", JSON.stringify(updated))
+  const deleteWeeklyFeed = async (id: string) => {
+    const { error } = await supabase.from("weekly_feeds").delete().eq("id", id)
+    if (error) throw error
+    await fetchFeeds()
   }
 
-  const getFeedsByBatch = (batchId: string) => {
-    return weeklyFeeds.filter((f) => f.batchId === batchId).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
-  }
+  const getFeedsByBatch = (batchId: string) =>
+    weeklyFeeds.filter((f) => f.batchId === batchId).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
 
-  const getTotalFeedForBatch = (batchId: string, upToDate?: string) => {
-    return weeklyFeeds
+  const getTotalFeedForBatch = (batchId: string, upToDate?: string) =>
+    weeklyFeeds
       .filter((f) => f.batchId === batchId)
       .filter((f) => !upToDate || f.weekEnd <= upToDate)
       .reduce((sum, f) => sum + f.totalFeedKg, 0)
-  }
 
-  const getLatestWeightForBatch = (batchId: string, upToDate?: string): number => {
-    const feedsForBatch = weeklyFeeds
+  const getLatestWeightForBatch = (batchId: string, upToDate?: string) => {
+    const feeds = weeklyFeeds
       .filter((f) => f.batchId === batchId)
       .filter((f) => !upToDate || f.weekEnd <= upToDate)
       .sort((a, b) => b.weekEnd.localeCompare(a.weekEnd))
-
-    return feedsForBatch[0]?.averageWeightKg || 0
+    return feeds[0]?.averageWeightKg ?? 0
   }
 
   return (
     <WeeklyFeedContext.Provider
       value={{
         weeklyFeeds,
+        loading,
+        refetch: fetchFeeds,
         addWeeklyFeed,
         updateWeeklyFeed,
         deleteWeeklyFeed,
@@ -98,9 +108,7 @@ export function WeeklyFeedProvider({ children }: { children: React.ReactNode }) 
 }
 
 export function useWeeklyFeed() {
-  const context = useContext(WeeklyFeedContext)
-  if (context === undefined) {
-    throw new Error("useWeeklyFeed must be used within a WeeklyFeedProvider")
-  }
-  return context
+  const ctx = useContext(WeeklyFeedContext)
+  if (ctx === undefined) throw new Error("useWeeklyFeed must be used within a WeeklyFeedProvider")
+  return ctx
 }

@@ -90,11 +90,111 @@ CREATE TABLE IF NOT EXISTS daily_logs (
 ALTER TABLE daily_logs DISABLE ROW LEVEL SECURITY;
 \`\`\`
 
+### Transactions Table (Finance)
+\`\`\`sql
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  category TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  date DATE NOT NULL,
+  description TEXT NOT NULL,
+  reference TEXT NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+\`\`\`
+
+### Issues Table
+\`\`\`sql
+CREATE TABLE IF NOT EXISTS issues (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  "batchId" TEXT NOT NULL,
+  "itemId" TEXT NOT NULL,
+  quantity DECIMAL(10,2) NOT NULL,
+  "costPerUnit" DECIMAL(10,2) NOT NULL,
+  "totalCost" DECIMAL(10,2) NOT NULL,
+  purpose TEXT,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE issues DISABLE ROW LEVEL SECURITY;
+\`\`\`
+
+### Master Data: Farms, Houses, Suppliers, Buyers, Feed Types
+\`\`\`sql
+CREATE TABLE IF NOT EXISTS farms (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, location TEXT NOT NULL,
+  capacity INTEGER NOT NULL, "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE farms DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS houses (
+  id TEXT PRIMARY KEY, "farmId" TEXT NOT NULL, name TEXT NOT NULL,
+  capacity INTEGER NOT NULL, status TEXT NOT NULL CHECK (status IN ('active', 'maintenance', 'inactive')),
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE houses DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS suppliers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('feed', 'medicine', 'equipment', 'other')),
+  contact TEXT NOT NULL, "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE suppliers DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS buyers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, contact TEXT NOT NULL,
+  address TEXT NOT NULL, "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE buyers DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS feed_types (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('starter', 'grower', 'finisher')),
+  protein DECIMAL(5,2) NOT NULL, price DECIMAL(10,2) NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE feed_types DISABLE ROW LEVEL SECURITY;
+\`\`\`
+
+### Batches, Workers, Weekly Feeds, Batch Sections
+\`\`\`sql
+CREATE TABLE IF NOT EXISTS batches (
+  id TEXT PRIMARY KEY, "houseId" TEXT NOT NULL, name TEXT NOT NULL,
+  "placementDate" DATE NOT NULL, "initialBirds" INTEGER NOT NULL, breed TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'closed')),
+  "targetFCR" DECIMAL(5,2) NOT NULL, "mortalityThreshold" DECIMAL(5,2) NOT NULL,
+  "workerIds" TEXT[] DEFAULT '{}', "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE batches DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS workers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT, location TEXT,
+  active BOOLEAN DEFAULT true, "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE workers DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS weekly_feeds (
+  id TEXT PRIMARY KEY, "batchId" TEXT NOT NULL, "houseId" TEXT NOT NULL,
+  "weekStart" DATE NOT NULL, "weekEnd" DATE NOT NULL,
+  "totalFeedKg" DECIMAL(10,2) NOT NULL, "averageWeightKg" DECIMAL(10,2) NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE weekly_feeds DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS batch_sections (
+  id TEXT PRIMARY KEY, "batchId" TEXT NOT NULL, name TEXT NOT NULL,
+  "workerId" TEXT, "initialBirds" INTEGER NOT NULL, "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE batch_sections DISABLE ROW LEVEL SECURITY;
+\`\`\`
+
 ## Step 2: Verify Tables
 
 After creating tables, verify they exist:
 1. Go to Supabase Dashboard → Table Editor
-2. You should see: `sales`, `inventory`, `purchases`, `daily_logs`
+2. You should see: `sales`, `inventory`, `purchases`, `daily_logs`, `transactions`, `issues`, `farms`, `houses`, `suppliers`, `buyers`, `feed_types`, `batches`, `workers`, `weekly_feeds`, `batch_sections`
 
 ## Step 3: Test the Application
 
@@ -105,6 +205,11 @@ After creating tables, verify they exist:
 5. Verify data appears in Supabase Table Editor
 
 ## Troubleshooting
+
+### "8 issues" / multiple fetch errors in console
+- The app fetches from 8 context sources (transactions, batches, daily_logs, workers, weekly_feeds, batch_sections, master data, inventory).
+- If you see warnings like `[FarmManager] Fetch failed: transactions...` or `Error fetching ... from Supabase`, one or more tables are missing.
+- **Fix:** Run **all** CREATE TABLE blocks above in the Supabase SQL Editor (including `transactions`, `issues`, `farms`, `houses`, etc.), then disable RLS on each.
 
 ### "Table does not exist" error
 - Make sure you ran the CREATE TABLE commands

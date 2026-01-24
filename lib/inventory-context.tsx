@@ -1,7 +1,9 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { logFetchError } from "@/lib/supabase-errors"
 
 export interface InventoryItem {
   id: string
@@ -26,7 +28,7 @@ export interface PurchaseEntry {
   unitRate: number
   totalAmount: number
   invoiceNumber: string
-  financeTransactionId?: string // Link to finance expense transaction
+  financeTransactionId?: string
   createdAt: string
 }
 
@@ -48,12 +50,12 @@ export interface SaleEntry {
   buyerId: string
   birds: number
   avgWeightKg: number
-  liveWeightKg: number // Auto-calculated: birds × avgWeightKg
+  liveWeightKg: number
   ratePerKg: number
-  totalValue: number // Auto-calculated: liveWeightKg × ratePerKg
+  totalValue: number
   invoiceNumber: string
   remarks: string
-  financeTransactionId?: string // Link to finance income transaction
+  financeTransactionId?: string
   createdAt: string
 }
 
@@ -62,18 +64,20 @@ interface InventoryContextType {
   purchases: PurchaseEntry[]
   issues: IssueEntry[]
   sales: SaleEntry[]
-  addItem: (item: Omit<InventoryItem, "id" | "createdAt" | "currentStock" | "averageCost">) => void
-  updateItem: (id: string, item: Partial<InventoryItem>) => void
-  deleteItem: (id: string) => void
-  addPurchase: (purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">) => PurchaseEntry
-  updatePurchase: (id: string, purchase: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>) => void
-  deletePurchase: (id: string) => void
-  linkPurchaseToFinance: (purchaseId: string, financeTransactionId: string) => void
-  addSale: (sale: Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue" | "financeTransactionId">) => SaleEntry
-  updateSale: (id: string, sale: Partial<Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue">>) => void
-  deleteSale: (id: string) => void
-  linkSaleToFinance: (saleId: string, financeTransactionId: string) => void
-  addIssue: (issue: Omit<IssueEntry, "id" | "createdAt" | "costPerUnit" | "totalCost">) => void
+  loading: boolean
+  refetch: () => Promise<void>
+  addItem: (item: Omit<InventoryItem, "id" | "createdAt" | "currentStock" | "averageCost">) => Promise<void>
+  updateItem: (id: string, item: Partial<InventoryItem>) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
+  addPurchase: (purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">) => Promise<PurchaseEntry | null>
+  updatePurchase: (id: string, purchase: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>) => Promise<void>
+  deletePurchase: (id: string) => Promise<void>
+  linkPurchaseToFinance: (purchaseId: string, financeTransactionId: string) => Promise<void>
+  addSale: (sale: Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue" | "financeTransactionId">) => Promise<SaleEntry | null>
+  updateSale: (id: string, sale: Partial<Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue">>) => Promise<void>
+  deleteSale: (id: string) => Promise<void>
+  linkSaleToFinance: (saleId: string, financeTransactionId: string) => Promise<void>
+  addIssue: (issue: Omit<IssueEntry, "id" | "createdAt" | "costPerUnit" | "totalCost">) => Promise<void>
   getPurchasesByItem: (itemId: string) => PurchaseEntry[]
   getIssuesByItem: (itemId: string) => IssueEntry[]
   getIssuesByBatch: (batchId: string) => IssueEntry[]
@@ -93,470 +97,213 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [purchases, setPurchases] = useState<PurchaseEntry[]>([])
   const [issues, setIssues] = useState<IssueEntry[]>([])
   const [sales, setSales] = useState<SaleEntry[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
+  const fetchInventory = useCallback(async () => {
     try {
-      const storedItems = localStorage.getItem("poultry_inventory_items")
-      const storedPurchases = localStorage.getItem("poultry_purchases")
-      const storedIssues = localStorage.getItem("poultry_issues")
-      const storedSales = localStorage.getItem("poultry_sales")
-    
-    if (storedItems) {
-      const parsedItems = JSON.parse(storedItems)
-      // Clean up any corrupted stock values (e.g., "6000.00 6000" -> 6000.00)
-      const cleanedItems = parsedItems.map((item: InventoryItem) => {
-        if (typeof item.currentStock !== 'number') {
-          const stockStr = String(item.currentStock).trim()
-          const match = stockStr.match(/^[\d.]+/)
-          item.currentStock = match ? Number.parseFloat(match[0]) : 0
-        }
-        return item
-      })
-      setItems(cleanedItems)
-      // Save cleaned data back to localStorage
-      if (JSON.stringify(cleanedItems) !== storedItems) {
-        localStorage.setItem("poultry_inventory_items", JSON.stringify(cleanedItems))
-      }
-    }
-    
-    if (storedPurchases) {
-      const parsedPurchases = JSON.parse(storedPurchases)
-      // Clean up any corrupted quantity values
-      const cleanedPurchases = parsedPurchases.map((purchase: PurchaseEntry) => {
-        if (typeof purchase.quantity !== 'number') {
-          const qtyStr = String(purchase.quantity).trim()
-          const match = qtyStr.match(/^[\d.]+/)
-          purchase.quantity = match ? Number.parseFloat(match[0]) : 0
-        }
-        return purchase
-      })
-      setPurchases(cleanedPurchases)
-      // Save cleaned data back to localStorage
-      if (JSON.stringify(cleanedPurchases) !== storedPurchases) {
-        localStorage.setItem("poultry_purchases", JSON.stringify(cleanedPurchases))
-      }
-    }
-    
-      if (storedIssues) {
-        const parsed = JSON.parse(storedIssues)
-        if (Array.isArray(parsed)) setIssues(parsed)
-      }
-      if (storedSales) {
-        const parsed = JSON.parse(storedSales)
-        if (Array.isArray(parsed)) setSales(parsed)
-      }
-    } catch (error) {
-      console.error("Error loading inventory data from localStorage:", error)
+      setLoading(true)
+      const [itemsRes, purchasesRes, salesRes, issuesRes] = await Promise.all([
+        supabase.from("inventory").select("*").order("code", { ascending: true, nullsFirst: false }),
+        supabase.from("purchases").select("*").order("date", { ascending: false }),
+        supabase.from("sales").select("*").order("date", { ascending: false }),
+        supabase.from("issues").select("*").order("date", { ascending: false }),
+      ])
+      if (itemsRes.error) throw itemsRes.error
+      if (purchasesRes.error) throw purchasesRes.error
+      if (salesRes.error) throw salesRes.error
+      setItems((itemsRes.data as InventoryItem[]) || [])
+      setPurchases((purchasesRes.data as PurchaseEntry[]) || [])
+      setSales((salesRes.data as SaleEntry[]) || [])
+      if (issuesRes.error && issuesRes.error.code !== "PGRST116") throw issuesRes.error
+      setIssues((issuesRes.data as IssueEntry[]) || [])
+    } catch (e) {
+      logFetchError("inventory (inventory, purchases, sales, issues)", e)
+      setItems([])
+      setPurchases([])
+      setIssues([])
+      setSales([])
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  const addItem = (item: Omit<InventoryItem, "id" | "createdAt" | "currentStock" | "averageCost">) => {
-    setItems((prevItems) => {
-      const averageCost = item.openingStock > 0 ? item.openingValue / item.openingStock : 0
-      const newItem: InventoryItem = {
-        ...item,
-        id: Date.now().toString(),
-        currentStock: item.openingStock,
-        averageCost,
-        createdAt: new Date().toISOString(),
-      }
-      const updatedItems = [...prevItems, newItem]
-      if (typeof window !== "undefined") {
-        localStorage.setItem("poultry_inventory_items", JSON.stringify(updatedItems))
-      }
-      return updatedItems
-    })
-  }
+  useEffect(() => {
+    fetchInventory()
+  }, [fetchInventory])
 
-  const updateItem = (id: string, item: Partial<InventoryItem>) => {
-    setItems((prevItems) => {
-      const updatedItems = prevItems.map((i) => (i.id === id ? { ...i, ...item } : i))
-      if (typeof window !== "undefined") {
-        localStorage.setItem("poultry_inventory_items", JSON.stringify(updatedItems))
-      }
-      return updatedItems
-    })
-  }
-
-  const deleteItem = (id: string) => {
-    setItems((prevItems) => {
-      const updatedItems = prevItems.filter((i) => i.id !== id)
-      if (typeof window !== "undefined") {
-        localStorage.setItem("poultry_inventory_items", JSON.stringify(updatedItems))
-      }
-      return updatedItems
-    })
-  }
-
-  const addPurchase = (purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">) => {
-    console.log("[Inventory Context] addPurchase called with:", purchase)
-    
-    // Read from localStorage to ensure we have the latest state
-    const currentPurchases = JSON.parse(localStorage.getItem("poultry_purchases") || "[]")
-    const currentItems = JSON.parse(localStorage.getItem("poultry_inventory_items") || "[]")
-    
-    const totalAmount = purchase.quantity * purchase.unitRate
-    const newPurchase: PurchaseEntry = {
-      ...purchase,
+  const addItem = async (item: Omit<InventoryItem, "id" | "createdAt" | "currentStock" | "averageCost">) => {
+    const averageCost = item.openingStock > 0 ? item.openingValue / item.openingStock : 0
+    const row = {
       id: Date.now().toString(),
+      ...item,
+      currentStock: item.openingStock,
+      averageCost,
+      createdAt: new Date().toISOString(),
+    }
+    const { error } = await supabase.from("inventory").insert(row)
+    if (error) throw error
+    await fetchInventory()
+  }
+
+  const updateItem = async (id: string, item: Partial<InventoryItem>) => {
+    const { error } = await supabase.from("inventory").update(item).eq("id", id)
+    if (error) throw error
+    await fetchInventory()
+  }
+
+  const deleteItem = async (id: string) => {
+    const { error } = await supabase.from("inventory").delete().eq("id", id)
+    if (error) throw error
+    await fetchInventory()
+  }
+
+  const addPurchase = async (
+    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">
+  ): Promise<PurchaseEntry | null> => {
+    const totalAmount = purchase.quantity * purchase.unitRate
+    const row = {
+      id: Date.now().toString(),
+      ...purchase,
       totalAmount,
       createdAt: new Date().toISOString(),
     }
-
-    console.log("[Inventory Context] New purchase created:", newPurchase)
-    console.log("[Inventory Context] Current purchases count:", currentPurchases.length)
-
-    // Update item stock and average cost using weighted average method
-    const item = currentItems.find((i: InventoryItem) => i.id === purchase.itemId)
+    const { data, error } = await supabase.from("purchases").insert(row).select().single()
+    if (error) throw error
+    const item = items.find((i) => i.id === purchase.itemId)
     if (item) {
-      const oldValue = item.currentStock * item.averageCost
-      const newValue = purchase.quantity * purchase.unitRate
       const newStock = item.currentStock + purchase.quantity
-      const newAverageCost = newStock > 0 ? (oldValue + newValue) / newStock : 0
-
-      const updatedItems = currentItems.map((i: InventoryItem) =>
-        i.id === purchase.itemId
-          ? {
-              ...i,
-              currentStock: newStock,
-              averageCost: newAverageCost,
-            }
-          : i,
-      )
-      setItems(updatedItems)
-      localStorage.setItem("poultry_inventory_items", JSON.stringify(updatedItems))
-      console.log("[Inventory Context] Item stock updated:", item.id, "New stock:", newStock)
+      const newAvg = newStock > 0 ? (item.currentStock * item.averageCost + totalAmount) / newStock : 0
+      await supabase.from("inventory").update({ currentStock: newStock, averageCost: newAvg }).eq("id", purchase.itemId)
     }
-
-    // Add purchase to list
-    const updatedPurchases = [...currentPurchases, newPurchase]
-    console.log("[Inventory Context] Updated purchases count:", updatedPurchases.length)
-    setPurchases(updatedPurchases)
-    localStorage.setItem("poultry_purchases", JSON.stringify(updatedPurchases))
-    console.log("[Inventory Context] Purchase saved to localStorage")
-    
-    return newPurchase
+    await fetchInventory()
+    return data as PurchaseEntry
   }
 
-  const linkPurchaseToFinance = (purchaseId: string, financeTransactionId: string) => {
-    // Read from localStorage to ensure we have the latest state
-    const currentPurchases = JSON.parse(localStorage.getItem("poultry_purchases") || "[]")
-    const updatedPurchases = currentPurchases.map((p: PurchaseEntry) =>
-      p.id === purchaseId ? { ...p, financeTransactionId } : p,
-    )
-    setPurchases(updatedPurchases)
-    localStorage.setItem("poultry_purchases", JSON.stringify(updatedPurchases))
+  const linkPurchaseToFinance = async (purchaseId: string, financeTransactionId: string) => {
+    const { error } = await supabase.from("purchases").update({ financeTransactionId }).eq("id", purchaseId)
+    if (error) throw error
+    await fetchInventory()
   }
 
-  const updatePurchase = (id: string, purchaseData: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>) => {
-    const existingPurchase = purchases.find((p) => p.id === id)
-    if (!existingPurchase) return
-
-    const item = items.find((i) => i.id === existingPurchase.itemId)
+  const updatePurchase = async (
+    id: string,
+    purchaseData: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>
+  ) => {
+    const existing = purchases.find((p) => p.id === id)
+    if (!existing) return
+    const item = items.find((i) => i.id === existing.itemId)
     if (!item) return
-
-    // Reverse the existing purchase's impact on stock
-    const oldValue = item.currentStock * item.averageCost
-    const oldPurchaseValue = existingPurchase.quantity * existingPurchase.unitRate
-    const oldStock = item.currentStock - existingPurchase.quantity
-
-    // Calculate what the average cost would have been before this purchase
-    let oldAverageCost = item.averageCost
-    if (oldStock > 0) {
-      const oldTotalValue = oldStock * item.averageCost - oldPurchaseValue
-      oldAverageCost = oldTotalValue / oldStock
-    } else {
-      oldAverageCost = 0
-    }
-
-    // Apply new purchase values
-    const newQuantity = purchaseData.quantity ?? existingPurchase.quantity
-    const newUnitRate = purchaseData.unitRate ?? existingPurchase.unitRate
-    const newItemId = purchaseData.itemId ?? existingPurchase.itemId
-
-    // If item changed, reverse from old item and add to new item
-    if (newItemId !== existingPurchase.itemId) {
-      // Reverse from old item
-      const oldItemStock = oldStock
-      updateItem(existingPurchase.itemId, {
-        currentStock: Math.max(0, oldItemStock),
-        averageCost: oldAverageCost >= 0 ? oldAverageCost : 0,
-      })
-
-      // Add to new item
-      const newItem = items.find((i) => i.id === newItemId)
-      if (newItem) {
-        const newItemOldValue = newItem.currentStock * newItem.averageCost
-        const newItemNewValue = newQuantity * newUnitRate
-        const newItemNewStock = newItem.currentStock + newQuantity
-        const newItemNewAverageCost = newItemNewStock > 0 ? (newItemOldValue + newItemNewValue) / newItemNewStock : 0
-        updateItem(newItemId, {
-          currentStock: newItemNewStock,
-          averageCost: newItemNewAverageCost,
-        })
-      }
-    } else {
-      // Same item - recalculate stock and average cost
-      const newStock = oldStock + newQuantity
-      const newTotalValue = oldStock * oldAverageCost + newQuantity * newUnitRate
-      const newAverageCost = newStock > 0 ? newTotalValue / newStock : 0
-
-      updateItem(newItemId, {
-        currentStock: Math.max(0, newStock),
-        averageCost: newAverageCost >= 0 ? newAverageCost : 0,
-      })
-    }
-
-    // Update purchase record
-    const totalAmount = newQuantity * newUnitRate
-    const updatedPurchases = purchases.map((p) =>
-      p.id === id
-        ? {
-            ...p,
-            ...purchaseData,
-            quantity: newQuantity,
-            unitRate: newUnitRate,
-            itemId: newItemId,
-            totalAmount,
-            supplierId: purchaseData.supplierId ?? p.supplierId,
-            date: purchaseData.date ?? p.date,
-            invoiceNumber: purchaseData.invoiceNumber ?? p.invoiceNumber,
-          }
-        : p,
-    )
-    setPurchases(updatedPurchases)
-    localStorage.setItem("poultry_purchases", JSON.stringify(updatedPurchases))
+    const newQty = purchaseData.quantity ?? existing.quantity
+    const newRate = purchaseData.unitRate ?? existing.unitRate
+    const totalAmount = newQty * newRate
+    const oldStock = item.currentStock - existing.quantity
+    const oldVal = oldStock * item.averageCost - existing.quantity * existing.unitRate
+    const oldAvg = oldStock > 0 ? oldVal / oldStock : item.averageCost
+    const newStock = oldStock + newQty
+    const newAvg = newStock > 0 ? (oldStock * oldAvg + totalAmount) / newStock : 0
+    await supabase.from("inventory").update({ currentStock: Math.max(0, newStock), averageCost: Math.max(0, newAvg) }).eq("id", existing.itemId)
+    await supabase.from("purchases").update({ ...purchaseData, quantity: newQty, unitRate: newRate, totalAmount }).eq("id", id)
+    await fetchInventory()
   }
 
-  const deletePurchase = (id: string) => {
-    console.log("[Inventory Context] deletePurchase called with id:", id)
-    
-    // Read from localStorage to ensure we have the latest state
-    const currentPurchases = JSON.parse(localStorage.getItem("poultry_purchases") || "[]")
-    const currentItems = JSON.parse(localStorage.getItem("poultry_inventory_items") || "[]")
-    
-    console.log("[Inventory Context] Current purchases count:", currentPurchases.length)
-    
-    const purchase = currentPurchases.find((p: PurchaseEntry) => p.id === id)
-    if (!purchase) {
-      console.warn(`[Inventory Context] Purchase with id ${id} not found`)
-      return
-    }
-
-    console.log("[Inventory Context] Found purchase:", purchase)
-    console.log("[Inventory Context] Finance transaction ID:", purchase.financeTransactionId)
-    
-    const item = currentItems.find((i: InventoryItem) => i.id === purchase.itemId)
-    console.log("[Inventory Context] Found item:", item ? `${item.code} - ${item.name}` : "Item not found")
-    
-    // Only reverse stock if item exists
+  const deletePurchase = async (id: string) => {
+    const purchase = purchases.find((p) => p.id === id)
+    if (!purchase) return
+    const item = items.find((i) => i.id === purchase.itemId)
     if (item) {
-      // Reverse the purchase's impact on stock using weighted average reversal
-      // Current total value = currentStock * averageCost
-      const currentTotalValue = item.currentStock * item.averageCost
-      // Purchase value that was added
-      const purchaseValue = purchase.quantity * purchase.unitRate
-      // Stock before this purchase
       const oldStock = item.currentStock - purchase.quantity
-
-      // Calculate average cost before this purchase
-      let oldAverageCost = 0
-      if (oldStock > 0) {
-        // Reverse the weighted average: total_value_before = total_value_now - purchase_value
-        const oldTotalValue = currentTotalValue - purchaseValue
-        oldAverageCost = oldTotalValue / oldStock
-      } else {
-        // If stock goes to 0 or below, reset to opening average cost
-        oldAverageCost = item.openingStock > 0 ? item.openingValue / item.openingStock : 0
-      }
-
-      // Ensure average cost is not negative
-      oldAverageCost = Math.max(0, oldAverageCost)
-
-      // Update item stock and average cost
-      const updatedItems = currentItems.map((i: InventoryItem) =>
-        i.id === purchase.itemId
-          ? {
-              ...i,
-              currentStock: Math.max(0, oldStock),
-              averageCost: oldAverageCost,
-            }
-          : i,
-      )
-      setItems(updatedItems)
-      localStorage.setItem("poultry_inventory_items", JSON.stringify(updatedItems))
+      const oldVal = item.currentStock * item.averageCost - purchase.quantity * purchase.unitRate
+      const oldAvg = oldStock > 0 ? oldVal / oldStock : 0
+      await supabase.from("inventory").update({ currentStock: Math.max(0, oldStock), averageCost: Math.max(0, oldAvg) }).eq("id", purchase.itemId)
     }
-
-    // Remove purchase - always delete the purchase record even if item is deleted
-    const updatedPurchases = currentPurchases.filter((p: PurchaseEntry) => p.id !== id)
-    console.log("[Inventory Context] Updated purchases count:", updatedPurchases.length)
-    console.log("[Inventory Context] Purchase removed successfully")
-    
-    setPurchases(updatedPurchases)
-    localStorage.setItem("poultry_purchases", JSON.stringify(updatedPurchases))
-    
-    console.log("[Inventory Context] Purchase deleted and state updated")
+    const { error } = await supabase.from("purchases").delete().eq("id", id)
+    if (error) throw error
+    await fetchInventory()
   }
 
-  const addSale = (sale: Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue" | "financeTransactionId">) => {
-    // Read from localStorage to ensure we have the latest state
-    const currentSales = JSON.parse(localStorage.getItem("poultry_sales") || "[]")
-    
+  const addSale = async (
+    sale: Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue" | "financeTransactionId">
+  ): Promise<SaleEntry | null> => {
     const liveWeightKg = sale.birds * sale.avgWeightKg
     const totalValue = liveWeightKg * sale.ratePerKg
-    
-    const newSale: SaleEntry = {
-      ...sale,
+    const row = {
       id: Date.now().toString(),
+      ...sale,
       liveWeightKg,
       totalValue,
       createdAt: new Date().toISOString(),
     }
-
-    const updatedSales = [...currentSales, newSale]
-    setSales(updatedSales)
-    localStorage.setItem("poultry_sales", JSON.stringify(updatedSales))
-    return newSale
+    const { data, error } = await supabase.from("sales").insert(row).select().single()
+    if (error) throw error
+    await fetchInventory()
+    return data as SaleEntry
   }
 
-  const updateSale = (id: string, saleData: Partial<Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue">>) => {
-    // Read from localStorage to ensure we have the latest state
-    const currentSales = JSON.parse(localStorage.getItem("poultry_sales") || "[]")
-    
-    const existingSale = currentSales.find((s: SaleEntry) => s.id === id)
-    if (!existingSale) return
-
-    // Recalculate liveWeight and totalValue if birds, avgWeightKg, or ratePerKg changed
-    const birds = saleData.birds ?? existingSale.birds
-    const avgWeightKg = saleData.avgWeightKg ?? existingSale.avgWeightKg
-    const ratePerKg = saleData.ratePerKg ?? existingSale.ratePerKg
-    
+  const updateSale = async (
+    id: string,
+    saleData: Partial<Omit<SaleEntry, "id" | "createdAt" | "liveWeightKg" | "totalValue">>
+  ) => {
+    const existing = sales.find((s) => s.id === id)
+    if (!existing) return
+    const birds = saleData.birds ?? existing.birds
+    const avgWeightKg = saleData.avgWeightKg ?? existing.avgWeightKg
+    const ratePerKg = saleData.ratePerKg ?? existing.ratePerKg
     const liveWeightKg = birds * avgWeightKg
     const totalValue = liveWeightKg * ratePerKg
-
-    const updatedSales = currentSales.map((s: SaleEntry) =>
-      s.id === id
-        ? {
-            ...s,
-            ...saleData,
-            birds,
-            avgWeightKg,
-            ratePerKg,
-            liveWeightKg,
-            totalValue,
-          }
-        : s,
-    )
-    setSales(updatedSales)
-    localStorage.setItem("poultry_sales", JSON.stringify(updatedSales))
+    await supabase
+      .from("sales")
+      .update({ ...saleData, birds, avgWeightKg, ratePerKg, liveWeightKg, totalValue })
+      .eq("id", id)
+    await fetchInventory()
   }
 
-  const deleteSale = (id: string) => {
-    // Read from localStorage to ensure we have the latest state
-    const currentSales = JSON.parse(localStorage.getItem("poultry_sales") || "[]")
-    
-    const sale = currentSales.find((s: SaleEntry) => s.id === id)
-    if (!sale) return
-
-    // Remove sale
-    const updatedSales = currentSales.filter((s: SaleEntry) => s.id !== id)
-    setSales(updatedSales)
-    localStorage.setItem("poultry_sales", JSON.stringify(updatedSales))
+  const deleteSale = async (id: string) => {
+    const { error } = await supabase.from("sales").delete().eq("id", id)
+    if (error) throw error
+    await fetchInventory()
   }
 
-  const linkSaleToFinance = (saleId: string, financeTransactionId: string) => {
-    // Read from localStorage to ensure we have the latest state
-    const currentSales = JSON.parse(localStorage.getItem("poultry_sales") || "[]")
-    const updatedSales = currentSales.map((s: SaleEntry) =>
-      s.id === saleId ? { ...s, financeTransactionId } : s,
-    )
-    setSales(updatedSales)
-    localStorage.setItem("poultry_sales", JSON.stringify(updatedSales))
+  const linkSaleToFinance = async (saleId: string, financeTransactionId: string) => {
+    const { error } = await supabase.from("sales").update({ financeTransactionId }).eq("id", saleId)
+    if (error) throw error
+    await fetchInventory()
   }
 
-  const addIssue = (issue: Omit<IssueEntry, "id" | "createdAt" | "costPerUnit" | "totalCost">) => {
-    setItems((prevItems) => {
-      const item = prevItems.find((i) => i.id === issue.itemId)
-      if (!item) return prevItems
-
-      const costPerUnit = item.averageCost
-      const totalCost = issue.quantity * costPerUnit
-
-      const newIssue: IssueEntry = {
-        ...issue,
-        id: Date.now().toString(),
-        costPerUnit,
-        totalCost,
-        createdAt: new Date().toISOString(),
-      }
-
-      // Reduce stock
-      const updatedItems = prevItems.map((i) =>
-        i.id === issue.itemId
-          ? {
-              ...i,
-              currentStock: Math.max(0, i.currentStock - issue.quantity),
-            }
-          : i,
-      )
-
-      // Add issue
-      setIssues((prevIssues) => {
-        const updatedIssues = [...prevIssues, newIssue]
-        if (typeof window !== "undefined") {
-          localStorage.setItem("poultry_issues", JSON.stringify(updatedIssues))
-        }
-        return updatedIssues
-      })
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("poultry_inventory_items", JSON.stringify(updatedItems))
-      }
-      return updatedItems
-    })
+  const addIssue = async (issue: Omit<IssueEntry, "id" | "createdAt" | "costPerUnit" | "totalCost">) => {
+    const item = items.find((i) => i.id === issue.itemId)
+    if (!item) throw new Error("Item not found")
+    const costPerUnit = item.averageCost
+    const totalCost = issue.quantity * costPerUnit
+    const row = {
+      id: Date.now().toString(),
+      ...issue,
+      costPerUnit,
+      totalCost,
+      createdAt: new Date().toISOString(),
+    }
+    const { error } = await supabase.from("issues").insert(row)
+    if (error) throw error
+    await supabase
+      .from("inventory")
+      .update({ currentStock: Math.max(0, item.currentStock - issue.quantity) })
+      .eq("id", issue.itemId)
+    await fetchInventory()
   }
 
-  const getPurchasesByItem = (itemId: string) => {
-    return purchases.filter((p) => p.itemId === itemId).sort((a, b) => b.date.localeCompare(a.date))
-  }
-
-  const getIssuesByItem = (itemId: string) => {
-    return issues.filter((i) => i.itemId === itemId).sort((a, b) => b.date.localeCompare(a.date))
-  }
-
-  const getIssuesByBatch = (batchId: string) => {
-    return issues.filter((i) => i.batchId === batchId).sort((a, b) => b.date.localeCompare(a.date))
-  }
-
-  const getPurchaseById = (id: string) => {
-    return purchases.find((p) => p.id === id)
-  }
-
-  const getSaleById = (id: string) => {
-    return sales.find((s) => s.id === id)
-  }
-
-  const getSalesByBuyer = (buyerId: string) => {
-    return sales.filter((s) => s.buyerId === buyerId).sort((a, b) => b.date.localeCompare(a.date))
-  }
-
-  const getTotalBirdsSold = () => {
-    return sales.reduce((sum, s) => sum + s.birds, 0)
-  }
-
-  const getTotalRevenue = () => {
-    return sales.reduce((sum, s) => sum + s.totalValue, 0)
-  }
-
-  const getLowStockItems = () => {
-    return items.filter((item) => item.currentStock <= item.reorderLevel)
-  }
-
-  const getItemById = (id: string) => {
-    return items.find((i) => i.id === id)
-  }
+  const getPurchasesByItem = (itemId: string) =>
+    purchases.filter((p) => p.itemId === itemId).sort((a, b) => b.date.localeCompare(a.date))
+  const getIssuesByItem = (itemId: string) =>
+    issues.filter((i) => i.itemId === itemId).sort((a, b) => b.date.localeCompare(a.date))
+  const getIssuesByBatch = (batchId: string) =>
+    issues.filter((i) => i.batchId === batchId).sort((a, b) => b.date.localeCompare(a.date))
+  const getPurchaseById = (id: string) => purchases.find((p) => p.id === id)
+  const getSaleById = (id: string) => sales.find((s) => s.id === id)
+  const getSalesByBuyer = (buyerId: string) =>
+    sales.filter((s) => s.buyerId === buyerId).sort((a, b) => b.date.localeCompare(a.date))
+  const getTotalBirdsSold = () => sales.reduce((sum, s) => sum + s.birds, 0)
+  const getTotalRevenue = () => sales.reduce((sum, s) => sum + s.totalValue, 0)
+  const getLowStockItems = () => items.filter((i) => i.currentStock <= i.reorderLevel)
+  const getItemById = (id: string) => items.find((i) => i.id === id)
 
   return (
     <InventoryContext.Provider
@@ -565,6 +312,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         purchases,
         issues,
         sales,
+        loading,
+        refetch: fetchInventory,
         addItem,
         updateItem,
         deleteItem,
@@ -595,9 +344,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useInventory() {
-  const context = useContext(InventoryContext)
-  if (context === undefined) {
-    throw new Error("useInventory must be used within an InventoryProvider")
-  }
-  return context
+  const ctx = useContext(InventoryContext)
+  if (ctx === undefined) throw new Error("useInventory must be used within an InventoryProvider")
+  return ctx
 }

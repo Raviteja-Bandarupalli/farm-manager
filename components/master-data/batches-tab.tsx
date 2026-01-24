@@ -55,7 +55,7 @@ export function BatchesTab() {
     }
   }, [formData.houseId, formData.placementDate, houses])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (sections.length > 0) {
@@ -68,46 +68,54 @@ export function BatchesTab() {
       }
     }
 
-    if (editingId) {
-      updateBatch(editingId, {
-        ...formData,
-        initialBirds: Number.parseInt(formData.initialBirds),
-        targetFCR: Number.parseFloat(formData.targetFCR),
-        mortalityThreshold: Number.parseFloat(formData.mortalityThreshold),
-      })
-
-      deleteSectionsByBatch(editingId)
-      console.log("[BatchesTab] Editing batch, adding sections:", sections.length)
-      sections.forEach((section, index) => {
-        console.log(`[BatchesTab] Adding section ${index + 1}:`, section.name, "Worker:", section.workerId, "Birds:", section.initialBirds)
-        addSection({
-          batchId: editingId,
-          name: section.name,
-          workerId: section.workerId,
-          initialBirds: Number.parseInt(section.initialBirds),
+    try {
+      if (editingId) {
+        await updateBatch(editingId, {
+          ...formData,
+          status: formData.status || "active", // Ensure status is set
+          initialBirds: Number.parseInt(formData.initialBirds),
+          targetFCR: Number.parseFloat(formData.targetFCR),
+          mortalityThreshold: Number.parseFloat(formData.mortalityThreshold),
         })
-      })
-    } else {
-      const newBatch = addBatch({
-        ...formData,
-        initialBirds: Number.parseInt(formData.initialBirds),
-        targetFCR: Number.parseFloat(formData.targetFCR),
-        mortalityThreshold: Number.parseFloat(formData.mortalityThreshold),
-      })
 
-      console.log("[BatchesTab] Creating new batch, adding sections:", sections.length)
-      sections.forEach((section, index) => {
-        console.log(`[BatchesTab] Adding section ${index + 1}:`, section.name, "Worker:", section.workerId, "Birds:", section.initialBirds)
-        addSection({
-          batchId: newBatch.id,
-          name: section.name,
-          workerId: section.workerId,
-          initialBirds: Number.parseInt(section.initialBirds),
+        await deleteSectionsByBatch(editingId)
+        console.log("[BatchesTab] Editing batch, adding sections:", sections.length)
+        for (const section of sections) {
+          console.log(`[BatchesTab] Adding section:`, section.name, "Worker:", section.workerId, "Birds:", section.initialBirds)
+          await addSection({
+            batchId: editingId,
+            name: section.name,
+            workerId: section.workerId,
+            initialBirds: Number.parseInt(section.initialBirds),
+          })
+        }
+      } else {
+        const newBatch = await addBatch({
+          ...formData,
+          status: formData.status || "active", // Ensure status is explicitly set
+          initialBirds: Number.parseInt(formData.initialBirds),
+          targetFCR: Number.parseFloat(formData.targetFCR),
+          mortalityThreshold: Number.parseFloat(formData.mortalityThreshold),
         })
-      })
+
+        console.log("[BatchesTab] Created batch with status:", newBatch.status)
+        console.log("[BatchesTab] Creating new batch, adding sections:", sections.length)
+        for (const section of sections) {
+          console.log(`[BatchesTab] Adding section:`, section.name, "Worker:", section.workerId, "Birds:", section.initialBirds)
+          await addSection({
+            batchId: newBatch.id,
+            name: section.name,
+            workerId: section.workerId,
+            initialBirds: Number.parseInt(section.initialBirds),
+          })
+        }
+      }
+      resetForm()
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error("Error saving batch:", error)
+      alert(error instanceof Error ? error.message : "Failed to save batch. Please try again.")
     }
-    resetForm()
-    setIsDialogOpen(false)
   }
 
   const resetForm = () => {

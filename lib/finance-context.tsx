@@ -1,10 +1,11 @@
 "use client"
 
 import type React from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { logFetchError } from "@/lib/supabase-errors"
 
-import { createContext, useContext, useState, useEffect } from "react"
-
-interface Transaction {
+export interface Transaction {
   id: string
   type: "income" | "expense"
   category: string
@@ -17,9 +18,11 @@ interface Transaction {
 
 interface FinanceContextType {
   transactions: Transaction[]
-  addTransaction: (transaction: Omit<Transaction, "id" | "createdAt">) => void
-  updateTransaction: (id: string, transaction: Partial<Transaction>) => void
-  deleteTransaction: (id: string) => void
+  loading: boolean
+  refetch: () => Promise<void>
+  addTransaction: (transaction: Omit<Transaction, "id" | "createdAt">) => Promise<Transaction | null>
+  updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>
+  deleteTransaction: (id: string) => Promise<void>
   getTransactionsByDateRange: (startDate: string, endDate: string) => Transaction[]
   getTotalIncome: (startDate?: string, endDate?: string) => number
   getTotalExpenses: (startDate?: string, endDate?: string) => number
@@ -32,111 +35,97 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined)
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const storedTransactions = localStorage.getItem("poultry_transactions")
-    if (storedTransactions) setTransactions(JSON.parse(storedTransactions))
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false })
+      if (error) throw error
+      setTransactions((data as Transaction[]) || [])
+    } catch (e) {
+      logFetchError("transactions", e)
+      setTransactions([])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const addTransaction = (transaction: Omit<Transaction, "id" | "createdAt">) => {
-    const newTransaction: Transaction = {
-      ...transaction,
+  useEffect(() => {
+    fetchTransactions()
+  }, [fetchTransactions])
+
+  const addTransaction = async (t: Omit<Transaction, "id" | "createdAt">): Promise<Transaction | null> => {
+    const row = {
       id: Date.now().toString(),
+      ...t,
       createdAt: new Date().toISOString(),
     }
-    const updatedTransactions = [...transactions, newTransaction]
-    setTransactions(updatedTransactions)
-    localStorage.setItem("poultry_transactions", JSON.stringify(updatedTransactions))
-    return newTransaction
+    const { data, error } = await supabase.from("transactions").insert(row).select().single()
+    if (error) throw error
+    await fetchTransactions()
+    return data as Transaction
   }
 
-  const updateTransaction = (id: string, transaction: Partial<Transaction>) => {
-    const updatedTransactions = transactions.map((t) => (t.id === id ? { ...t, ...transaction } : t))
-    setTransactions(updatedTransactions)
-    localStorage.setItem("poultry_transactions", JSON.stringify(updatedTransactions))
+  const updateTransaction = async (id: string, t: Partial<Transaction>) => {
+    const { error } = await supabase.from("transactions").update(t).eq("id", id)
+    if (error) throw error
+    await fetchTransactions()
   }
 
-  const deleteTransaction = (id: string) => {
-    console.log("[Finance Context] deleteTransaction called with id:", id)
-    
-    // Read from localStorage to ensure we have the latest state
-    const currentTransactions = JSON.parse(localStorage.getItem("poultry_transactions") || "[]")
-    console.log("[Finance Context] Current transactions count:", currentTransactions.length)
-    console.log("[Finance Context] Transaction to delete exists:", currentTransactions.some((t: Transaction) => t.id === id))
-    
-    const updatedTransactions = currentTransactions.filter((t: Transaction) => t.id !== id)
-    console.log("[Finance Context] Updated transactions count:", updatedTransactions.length)
-    
-    setTransactions(updatedTransactions)
-    localStorage.setItem("poultry_transactions", JSON.stringify(updatedTransactions))
-    console.log("[Finance Context] Transaction deleted from localStorage")
-    
-    // Verify deletion
-    const verifyTransactions = JSON.parse(localStorage.getItem("poultry_transactions") || "[]")
-    const stillExists = verifyTransactions.some((t: Transaction) => t.id === id)
-    if (stillExists) {
-      console.error("[Finance Context] ERROR: Transaction still exists after deletion attempt!")
-    }
+  const deleteTransaction = async (id: string) => {
+    const { error } = await supabase.from("transactions").delete().eq("id", id)
+    if (error) throw error
+    await fetchTransactions()
   }
 
-  const getTransactionsByDateRange = (startDate: string, endDate: string) => {
-    return transactions
+  const getTransactionsByDateRange = (startDate: string, endDate: string) =>
+    transactions
       .filter((t) => t.date >= startDate && t.date <= endDate)
       .sort((a, b) => b.date.localeCompare(a.date))
-  }
 
   const getTotalIncome = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "income")
-    if (startDate && endDate) {
-      filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
-    }
+    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
     return filtered.reduce((sum, t) => sum + t.amount, 0)
   }
 
   const getTotalExpenses = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "expense")
-    if (startDate && endDate) {
-      filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
-    }
+    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
     return filtered.reduce((sum, t) => sum + t.amount, 0)
   }
 
-  const getBalance = (startDate?: string, endDate?: string) => {
-    return getTotalIncome(startDate, endDate) - getTotalExpenses(startDate, endDate)
-  }
+  const getBalance = (startDate?: string, endDate?: string) =>
+    getTotalIncome(startDate, endDate) - getTotalExpenses(startDate, endDate)
 
   const getIncomeByCategory = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "income")
-    if (startDate && endDate) {
-      filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
-    }
-    return filtered.reduce(
-      (acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount
-        return acc
-      },
-      {} as Record<string, number>,
-    )
+    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
+    return filtered.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount
+      return acc
+    }, {} as Record<string, number>)
   }
 
   const getExpensesByCategory = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "expense")
-    if (startDate && endDate) {
-      filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
-    }
-    return filtered.reduce(
-      (acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount
-        return acc
-      },
-      {} as Record<string, number>,
-    )
+    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
+    return filtered.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount
+      return acc
+    }, {} as Record<string, number>)
   }
 
   return (
     <FinanceContext.Provider
       value={{
         transactions,
+        loading,
+        refetch: fetchTransactions,
         addTransaction,
         updateTransaction,
         deleteTransaction,
@@ -154,9 +143,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useFinance() {
-  const context = useContext(FinanceContext)
-  if (context === undefined) {
-    throw new Error("useFinance must be used within a FinanceProvider")
-  }
-  return context
+  const ctx = useContext(FinanceContext)
+  if (ctx === undefined) throw new Error("useFinance must be used within a FinanceProvider")
+  return ctx
 }
