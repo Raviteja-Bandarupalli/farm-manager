@@ -528,6 +528,32 @@ export default function DailyLogsPage() {
                   </div>
 
                   {selectedBatch && (
+                    <Card className="bg-slate-50 border-slate-200">
+                      <CardHeader className="py-3 px-4">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                          Bird Count Summary
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-3 gap-4 py-3 px-4">
+                        <div className="space-y-1">
+                          <p className="text-xs text-slate-500 uppercase font-semibold">Opening</p>
+                          <p className="text-xl font-bold text-slate-900">{openingBirds.toLocaleString("en-IN")}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-slate-500 uppercase font-semibold">Mortality</p>
+                          <p className="text-xl font-bold text-red-600">-{finalMortality}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-slate-500 uppercase font-semibold">Closing</p>
+                          <p className="text-xl font-bold text-green-700">
+                            {(openingBirds - finalMortality).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {selectedBatch && (
                     <Alert className="bg-blue-50 border-blue-200">
                       <TrendingUp className="h-4 w-4 text-blue-600" />
                       <AlertDescription>

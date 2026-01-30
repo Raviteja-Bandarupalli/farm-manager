@@ -146,17 +146,11 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     // Generate a unique ID
     const logId = Date.now().toString() + Math.random().toString(36).slice(2, 9)
     
-    const newLog: DailyLog = {
+    const newLog = {
       ...log,
       id: logId,
       createdAt: new Date().toISOString(),
-      openingBirds: 0,
-      closingBirds: 0,
-      cumulativeMortality: 0,
-      cumulativeFeed: 0,
-      cumulativeMortalityPercent: 0,
-      cumulativeFCR: 0,
-    }
+    } as DailyLog
     
     console.log("[DailyLogs] Creating new log with ID:", logId)
     
@@ -260,6 +254,13 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       throw error
     }
     console.log("[DailyLogs] Successfully inserted:", data)
+
+    // Recalculate and update ALL logs for this batch to ensure the chain is perfect
+    for (const r of recalc) {
+      const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }
+      await supabase.from("daily_logs").update(row).eq("id", r.id)
+    }
+
     await fetchLogs()
     return saved
   }
@@ -277,10 +278,14 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
       weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
     )
-    const final = recalc.find((l) => l.id === id)!
-    const row = { ...final, sectionMortality: final.sectionMortality ? JSON.stringify(final.sectionMortality) : null }
-    const { error } = await supabase.from("daily_logs").update(row).eq("id", id)
-    if (error) throw error
+
+    // Update ALL logs in the batch to ensure the chain is correct
+    for (const r of recalc) {
+      const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }
+      const { error } = await supabase.from("daily_logs").update(row).eq("id", r.id)
+      if (error) throw error
+    }
+
     await fetchLogs()
   }
 
