@@ -9,6 +9,7 @@ import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry } from "@/lib/inventory-context"
+import { toDateKey } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -293,8 +294,8 @@ export default function InventoryPage() {
     const linkedIssues = getIssuesByItem(purchase.itemId)
     const item = getItemById(purchase.itemId)
     if (linkedIssues.length > 0) {
-      const purchaseDate = new Date(purchase.date)
-      const after = linkedIssues.filter((i) => new Date(i.date) >= purchaseDate)
+      const purchaseTime = toDateKey(purchase.date)
+      const after = linkedIssues.filter((i) => toDateKey(i.date) >= purchaseTime)
       if (after.length > 0) {
         alert(`Cannot delete this purchase. It is linked to ${after.length} issue/consumption record(s) that occurred on or after the purchase date.`)
         return
@@ -939,13 +940,13 @@ export default function InventoryPage() {
                     </TableHeader>
                     <TableBody>
                       {purchases
-                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
                         .map((purchase) => {
                           const item = getItemById(purchase.itemId)
                           const supplier = suppliers.find((s) => s.id === purchase.supplierId)
                           return (
                             <TableRow key={purchase.id}>
-                              <TableCell>{new Date(purchase.date).toLocaleDateString()}</TableCell>
+                              <TableCell>{formatIndianDate(purchase.date)}</TableCell>
                               <TableCell>{supplier?.name || "Unknown"}</TableCell>
                               <TableCell>
                                 {item ? `${item.code} - ${item.name}` : "Item Deleted"}
@@ -1067,13 +1068,13 @@ export default function InventoryPage() {
                     </TableHeader>
                     <TableBody>
                       {issues
-                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
                         .map((issue) => {
                           const item = getItemById(issue.itemId)
                           const batch = batches.find((b) => b.id === issue.batchId)
                           return (
                             <TableRow key={issue.id}>
-                              <TableCell>{new Date(issue.date).toLocaleDateString()}</TableCell>
+                              <TableCell>{formatIndianDate(issue.date)}</TableCell>
                               <TableCell>{batch?.batchNumber || "Unknown"}</TableCell>
                               <TableCell>
                                 {item ? `${item.code} - ${item.name}` : "Item Deleted"}

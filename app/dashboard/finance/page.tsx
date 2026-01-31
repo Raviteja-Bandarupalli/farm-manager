@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory } from "@/lib/inventory-context"
+import { toDateKey } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate, getFirstDayOfMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -145,7 +146,12 @@ export default function FinancePage() {
   const incomeByCategory = getIncomeByCategory(dateRange.start, dateRange.end)
   const expensesByCategory = getExpensesByCategory(dateRange.start, dateRange.end)
 
-  const issuesInRange = issues.filter((issue) => issue.date >= dateRange.start && issue.date <= dateRange.end)
+  const startTime = toDateKey(dateRange.start)
+  const endTime = toDateKey(dateRange.end)
+  const issuesInRange = issues.filter((issue) => {
+    const issueTime = toDateKey(issue.date)
+    return issueTime >= startTime && issueTime <= endTime
+  })
   let feedCostFromIssues = 0
   let medCostFromIssues = 0
 
@@ -161,8 +167,11 @@ export default function FinancePage() {
   })
 
   const sortedTransactions = [...transactions]
-    .filter((t) => t.date >= dateRange.start && t.date <= dateRange.end)
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .filter((t) => {
+      const tTime = toDateKey(t.date)
+      return tTime >= startTime && tTime <= endTime
+    })
+    .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
 
   const formatINR = (amount: number) =>
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })

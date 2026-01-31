@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
-import { useDailyLogs, type DailyLog } from "@/lib/daily-logs-context"
+import { useDailyLogs, type DailyLog, toDateKey } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -567,7 +567,7 @@ export default function DailyLogsPage() {
                           <div className="space-y-1">
                             <p className="text-[10px] text-slate-500 uppercase font-semibold">Current Batch Age</p>
                             <p className="text-sm font-bold text-slate-700">
-                              {Math.floor((new Date(formData.date).getTime() - new Date(selectedBatch.startDate).getTime()) / (1000 * 60 * 60 * 24))} Days
+                              {Math.floor((toDateKey(formData.date) - toDateKey(selectedBatch.placementDate)) / (1000 * 60 * 60 * 24))} Days
                             </p>
                           </div>
                         </div>

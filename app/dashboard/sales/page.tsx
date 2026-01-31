@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useMasterData } from "@/lib/master-data-context"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory } from "@/lib/inventory-context"
+import { toDateKey } from "@/lib/daily-logs-context"
 import { getTodayDate, getFirstDayOfYear, getLastDayOfYear } from "@/lib/date-utils"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { formatIndianDate } from "@/lib/utils"
 
 export default function SalesPage() {
   const { buyers } = useMasterData()
@@ -191,7 +193,7 @@ export default function SalesPage() {
   const handleDeleteSale = async (sale: { id: string; buyerId: string; date: string; birds: number; totalValue: number; financeTransactionId?: string }) => {
     const buyer = buyers.find((b) => b.id === sale.buyerId)
     const name = buyer ? buyer.name : "Unknown"
-    const msg = `Delete sale to ${name} on ${new Date(sale.date).toLocaleDateString()}?\n\nThis will:\n- Remove ${sale.birds} birds from sales\n- Remove ₹${sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })} from finance income`
+    const msg = `Delete sale to ${name} on ${formatIndianDate(sale.date)}?\n\nThis will:\n- Remove ${sale.birds} birds from sales\n- Remove ₹${sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })} from finance income`
     if (!confirm(msg)) return
     try {
       if (sale.financeTransactionId) await deleteTransaction(sale.financeTransactionId)
@@ -391,14 +393,14 @@ export default function SalesPage() {
                   </TableHeader>
                   <TableBody>
                     {[...filteredSales]
-                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
                       .map((sale) => {
                         const buyer = buyers.find((b) => b.id === sale.buyerId)
                         const liveWeight = sale.birds * sale.avgWeightKg
                         return (
                           <TableRow key={sale.id}>
                             <TableCell className="text-sm">
-                              {new Date(sale.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                              {formatIndianDate(sale.date)}
                             </TableCell>
                             <TableCell>{buyer ? buyer.name : "Buyer Deleted"}</TableCell>
                             <TableCell className="text-right">{sale.birds.toLocaleString("en-IN")}</TableCell>

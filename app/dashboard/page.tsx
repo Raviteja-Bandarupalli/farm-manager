@@ -1,7 +1,7 @@
 "use client"
 
 import { useMasterData } from "@/lib/master-data-context"
-import { useDailyLogs } from "@/lib/daily-logs-context"
+import { useDailyLogs, toDateKey } from "@/lib/daily-logs-context"
 import { useInventory } from "@/lib/inventory-context"
 import { useFinance } from "@/lib/finance-context"
 import { useBatch } from "@/lib/batch-context"
@@ -55,7 +55,7 @@ export default function DashboardPage() {
     console.log("[v0] Calculating live birds for", activeBatches.length, "active batches")
 
     activeBatches.forEach((batch) => {
-      const batchLogs = dailyLogs.filter((log) => log.batchId === batch.id).sort((a, b) => b.date.localeCompare(a.date))
+      const batchLogs = dailyLogs.filter((log) => log.batchId === batch.id).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
       const latestLog = batchLogs[0]
 
       if (latestLog) {
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           const house = houses.find((h) => h.id === batch.houseId)
           const farm = house ? farms.find((f) => f.id === house.farmId) : null
           const age = Math.ceil(
-            (new Date(latestLog.date).getTime() - new Date(batch.placementDate).getTime()) / (1000 * 60 * 60 * 24),
+            (toDateKey(latestLog.date) - toDateKey(batch.placementDate)) / (1000 * 60 * 60 * 24),
           )
 
           performanceAlerts.push({
@@ -133,7 +133,7 @@ export default function DashboardPage() {
     const startingBirds = batches.length > 0 
       ? batches.reduce((sum, b) => sum + (b.initialBirds || 0), 0)
       : dailyLogs.length > 0 
-        ? (dailyLogs.sort((a, b) => a.date.localeCompare(b.date))[0].openingBirds || 0)
+        ? (dailyLogs.sort((a, b) => toDateKey(a.date) - toDateKey(b.date))[0].openingBirds || 0)
         : 0
     
     if (startingBirds > 0) {
@@ -147,10 +147,10 @@ export default function DashboardPage() {
   }
 
   const recentLogs = dailyLogs.filter((log) => {
-    const logDate = new Date(log.date)
+    const logTime = toDateKey(log.date)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    return logDate >= thirtyDaysAgo
+    return logTime >= thirtyDaysAgo.getTime()
   })
 
   const totalMortality = recentLogs.reduce((sum, log) => sum + log.mortality, 0)

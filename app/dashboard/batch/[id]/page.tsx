@@ -1,7 +1,7 @@
 "use client"
 
 import { useBatch } from "@/lib/batch-context"
-import { useDailyLogs } from "@/lib/daily-logs-context"
+import { useDailyLogs, toDateKey } from "@/lib/daily-logs-context"
 import { useMasterData } from "@/lib/master-data-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
@@ -29,7 +29,7 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
   const { getFeedsByBatch, getTotalFeedForBatch, getLatestWeightForBatch } = useWeeklyFeed()
 
   const batch = batches.find((b) => b.id === id)
-  const batchLogs = dailyLogs.filter((log) => log.batchId === id).sort((a, b) => a.date.localeCompare(b.date))
+  const batchLogs = dailyLogs.filter((log) => log.batchId === id).sort((a, b) => toDateKey(a.date) - toDateKey(b.date))
 
   const weeklyFeeds = batch ? getFeedsByBatch(batch.id) : []
   const totalFeedUsed = batch ? getTotalFeedForBatch(batch.id) : 0
@@ -74,8 +74,8 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
   const batchWorkers = batch?.workerIds ? getWorkersByIds(batch.workerIds) : []
 
   const currentDate = new Date()
-  const placementDate = new Date(batch.placementDate)
-  const ageInDays = Math.ceil((currentDate.getTime() - placementDate.getTime()) / (1000 * 60 * 60 * 24))
+  const placementDateTime = toDateKey(batch.placementDate)
+  const ageInDays = Math.ceil((currentDate.getTime() - placementDateTime) / (1000 * 60 * 60 * 24))
 
   const latestLog = batchLogs[batchLogs.length - 1]
   const currentBirds = latestLog?.closingBirds || batch.initialBirds
@@ -381,8 +381,8 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
               </TableHeader>
               <TableBody>
                 {batchLogs.map((log) => {
-                  const logDate = new Date(log.date)
-                  const age = Math.ceil((logDate.getTime() - placementDate.getTime()) / (1000 * 60 * 60 * 24))
+                  const logTime = toDateKey(log.date)
+                  const age = Math.ceil((logTime - placementDateTime) / (1000 * 60 * 60 * 24))
 
                   return (
                     <TableRow key={log.id}>

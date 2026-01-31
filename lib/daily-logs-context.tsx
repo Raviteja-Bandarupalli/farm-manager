@@ -8,6 +8,22 @@ import { useAuth } from "./auth-context"
 import { useBatch } from "./batch-context"
 import { useWeeklyFeed } from "./weekly-feed-context"
 
+export function toDateKey(dateStr: string): number {
+  if (!dateStr) return 0
+  if (dateStr.includes("-")) {
+    const parts = dateStr.split("-")
+    if (parts[0].length === 4) {
+      // YYYY-MM-DD
+      return new Date(dateStr + "T00:00:00Z").getTime()
+    } else {
+      // DD-MM-YYYY
+      const [dd, mm, yyyy] = parts
+      return new Date(`${yyyy}-${mm}-${dd}T00:00:00Z`).getTime()
+    }
+  }
+  return new Date(dateStr).getTime()
+}
+
 export interface DailyLog {
   id: string
   batchId: string
@@ -72,7 +88,7 @@ function recalculateBatchLogs(
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .forEach(l => logsByDate.set(l.date, l))
 
-  const sortedLogs = Array.from(logsByDate.values()).sort((a, b) => a.date.localeCompare(b.date))
+  const sortedLogs = Array.from(logsByDate.values()).sort((a, b) => toDateKey(a.date) - toDateKey(b.date))
 
   const out: DailyLog[] = []
   let runningCumulativeMortality = 0
@@ -84,8 +100,9 @@ function recalculateBatchLogs(
 
     runningCumulativeMortality += cur.mortality
 
+    const curDateKey = toDateKey(cur.date)
     const cumulativeFeed = weeklyFeeds
-      .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
+      .filter((f) => f.batchId === batchId && toDateKey(f.weekEnd) <= curDateKey)
       .reduce((s, f) => s + f.totalFeedKg, 0)
 
     const cumulativeMortalityPercent = initialBirds > 0 ? (runningCumulativeMortality / initialBirds) * 100 : 0
@@ -113,7 +130,7 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("daily_logs").select("*").order("date", { ascending: false })
+      const { data, error } = await supabase.from("daily_logs").select("*")
       if (error) throw error
       const list = (data as DailyLog[]) || []
       list.forEach((l) => {
@@ -123,6 +140,8 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
           } catch (_) {}
         }
       })
+      // Sort by date descending
+      list.sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
       setDailyLogs(list)
     } catch (e) {
       logFetchError("daily_logs", e)
@@ -152,33 +171,25 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     const existing = dailyLogs.find((l) => l.batchId === log.batchId && l.date === log.date)
     if (existing) throw new Error(`A daily log already exists for this batch on ${log.date}. Only one entry per day is allowed.`)
     
-    // Generate a unique ID
+    // Generate a unique ID and createdAt
     const logId = Date.now().toString() + Math.random().toString(36).slice(2, 9)
+    const createdAt = new Date().toISOString()
     
-    const insertPayload = {
+    // Create a temporary log object for recalculation (placeholders for derived fields)
+    const tempLog: DailyLog = {
       ...log,
       id: logId,
-      sectionMortality: log.sectionMortality ? JSON.stringify(log.sectionMortality) : null,
-      createdAt: new Date().toISOString(),
+      createdAt,
+      openingBirds: 0,
+      closingBirds: 0,
+      cumulativeMortality: 0,
+      cumulativeFeed: 0,
+      cumulativeMortalityPercent: 0,
+      cumulativeFCR: 0,
     }
     
-    console.log("[DailyLogs] Inserting new log:", logId, log.date)
-
-    const { error: insertError } = await supabase.from("daily_logs").insert(insertPayload)
-    if (insertError) {
-      console.error("[DailyLogs] Insert error:", insertError)
-      throw insertError
-    }
-
-    // Now run batch-wide recalculation and update all logs for that batch
-    // Ensure newLog has sectionMortality as object for consistency with dailyLogs state
-    const newLog = {
-      ...log,
-      id: logId,
-      createdAt: insertPayload.createdAt
-    } as DailyLog
-    
-    const allLogs = [...dailyLogs, newLog]
+    // Recalculate ALL logs for this batch including the new one
+    const allLogs = [...dailyLogs, tempLog]
     const recalc = recalculateBatchLogs(
       log.batchId,
       allLogs,
@@ -186,10 +197,28 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
     )
 
-    console.log(`[DailyLogs] Updating ${recalc.length} logs for batch ${log.batchId}`)
+    const calculatedNewLog = recalc.find(l => l.id === logId)
+    if (!calculatedNewLog) throw new Error("Failed to calculate values for new log")
 
-    // Update ALL logs for this batch to ensure the chain is perfect
+    console.log("[DailyLogs] Inserting new log with calculated values:", logId, log.date)
+
+    const insertPayload = {
+      ...calculatedNewLog,
+      sectionMortality: calculatedNewLog.sectionMortality ? JSON.stringify(calculatedNewLog.sectionMortality) : null,
+    }
+
+    const { error: insertError } = await supabase.from("daily_logs").insert(insertPayload)
+    if (insertError) {
+      console.error("[DailyLogs] Insert error:", insertError)
+      throw insertError
+    }
+
+    console.log(`[DailyLogs] Updating other ${recalc.length - 1} logs for batch ${log.batchId}`)
+
+    // Update OTHER logs for this batch that might have changed due to the insertion
     for (const r of recalc) {
+      if (r.id === logId) continue // already inserted
+
       const updateRow = {
         ...r,
         sectionMortality: r.sectionMortality && typeof r.sectionMortality === 'object'
@@ -263,15 +292,16 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
   }
 
   const getLogsByBatch = (batchId: string) =>
-    dailyLogs.filter((l) => l.batchId === batchId).sort((a, b) => a.date.localeCompare(b.date))
+    dailyLogs.filter((l) => l.batchId === batchId).sort((a, b) => toDateKey(a.date) - toDateKey(b.date))
   const getLogsByHouse = (houseId: string) =>
-    dailyLogs.filter((l) => l.houseId === houseId).sort((a, b) => b.date.localeCompare(a.date))
+    dailyLogs.filter((l) => l.houseId === houseId).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
   const getLastLogForBatch = (batchId: string, beforeDate?: string) => {
+    const beforeDateKey = beforeDate ? toDateKey(beforeDate) : Number.MAX_SAFE_INTEGER
     const filtered = dailyLogs
       .filter((l) => l.batchId === batchId)
-      .filter((l) => !beforeDate || l.date < beforeDate)
+      .filter((l) => toDateKey(l.date) < beforeDateKey)
       .sort((a, b) => {
-        const d = b.date.localeCompare(a.date)
+        const d = toDateKey(b.date) - toDateKey(a.date)
         if (d !== 0) return d
         return b.createdAt.localeCompare(a.createdAt)
       })
