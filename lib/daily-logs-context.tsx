@@ -63,32 +63,41 @@ function recalculateBatchLogs(
 ): DailyLog[] {
   const batch = batches.find((b) => b.id === batchId)
   const initialBirds = batch?.initialBirds ?? 0
-  const batchLogs = allLogs
+
+  // Get all logs for this batch and sort them by date
+  // Using a Map to ensure only one log per date (last one wins if duplicates exist)
+  const logsByDate = new Map<string, DailyLog>()
+  allLogs
     .filter((l) => l.batchId === batchId)
-    .sort((a, b) => {
-      const d = a.date.localeCompare(b.date)
-      if (d !== 0) return d
-      return a.createdAt.localeCompare(b.createdAt)
-    })
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .forEach(l => logsByDate.set(l.date, l))
+
+  const sortedLogs = Array.from(logsByDate.values()).sort((a, b) => a.date.localeCompare(b.date))
+
   const out: DailyLog[] = []
-  for (let i = 0; i < batchLogs.length; i++) {
-    const cur = batchLogs[i]
+  let runningCumulativeMortality = 0
+
+  for (let i = 0; i < sortedLogs.length; i++) {
+    const cur = sortedLogs[i]
     const openingBirds = i === 0 ? initialBirds : out[i - 1].closingBirds
     const closingBirds = openingBirds - cur.mortality
-    const cumulativeMortality = i === 0 ? cur.mortality : out[i - 1].cumulativeMortality + cur.mortality
+
+    runningCumulativeMortality += cur.mortality
+
     const cumulativeFeed = weeklyFeeds
       .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
       .reduce((s, f) => s + f.totalFeedKg, 0)
-    const cumulativeMortalityPercent = initialBirds > 0 ? (cumulativeMortality / initialBirds) * 100 : 0
+
+    const cumulativeMortalityPercent = initialBirds > 0 ? (runningCumulativeMortality / initialBirds) * 100 : 0
+
     out.push({
       ...cur,
-      id: cur.id, // Explicitly preserve id
       openingBirds,
       closingBirds,
-      cumulativeMortality,
+      cumulativeMortality: runningCumulativeMortality,
       cumulativeFeed,
       cumulativeMortalityPercent,
-      cumulativeFCR: 0,
+      cumulativeFCR: cur.cumulativeFCR || 0,
     })
   }
   return out
@@ -146,13 +155,28 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     // Generate a unique ID
     const logId = Date.now().toString() + Math.random().toString(36).slice(2, 9)
     
+    const insertPayload = {
+      ...log,
+      id: logId,
+      sectionMortality: log.sectionMortality ? JSON.stringify(log.sectionMortality) : null,
+      createdAt: new Date().toISOString(),
+    }
+    
+    console.log("[DailyLogs] Inserting new log:", logId, log.date)
+
+    const { error: insertError } = await supabase.from("daily_logs").insert(insertPayload)
+    if (insertError) {
+      console.error("[DailyLogs] Insert error:", insertError)
+      throw insertError
+    }
+
+    // Now run batch-wide recalculation and update all logs for that batch
+    // Ensure newLog has sectionMortality as object for consistency with dailyLogs state
     const newLog = {
       ...log,
       id: logId,
-      createdAt: new Date().toISOString(),
+      createdAt: insertPayload.createdAt
     } as DailyLog
-    
-    console.log("[DailyLogs] Creating new log with ID:", logId)
     
     const allLogs = [...dailyLogs, newLog]
     const recalc = recalculateBatchLogs(
@@ -161,107 +185,26 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
       weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
     )
-    const saved = recalc.find((l) => l.id === logId)
-    if (!saved) throw new Error("Failed to recalculate daily log")
-    if (!saved.id) throw new Error("Daily log ID is missing after recalculation")
-    
-    const finalId = saved.id || logId
-    if (!finalId) {
-      throw new Error("Daily log ID is missing - cannot save")
-    }
-    console.log("[DailyLogs] Saving log with ID:", finalId, "Row keys:", Object.keys(saved))
-    
-    // Ensure id is explicitly included and not null - use logId as ultimate fallback
-    const safeId = finalId || logId || `log-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    if (!safeId) {
-      throw new Error("Failed to generate daily log ID")
-    }
-    
-    // Build row object with ID as first property to ensure it's never lost
-    const row: any = {
-      id: String(safeId), // Explicitly convert to string
-      batchId: String(saved.batchId),
-      houseId: String(saved.houseId),
-      sectionId: saved.sectionId ? String(saved.sectionId) : null,
-      sectionMortality: saved.sectionMortality ? JSON.stringify(saved.sectionMortality) : null,
-      date: String(saved.date),
-      openingBirds: Number(saved.openingBirds),
-      mortality: Number(saved.mortality),
-      closingBirds: Number(saved.closingBirds),
-      feedTypeId: saved.feedTypeId ? String(saved.feedTypeId) : null,
-      cumulativeMortality: Number(saved.cumulativeMortality),
-      cumulativeFeed: Number(saved.cumulativeFeed),
-      cumulativeMortalityPercent: Number(saved.cumulativeMortalityPercent),
-      cumulativeFCR: Number(saved.cumulativeFCR),
-      temperature: saved.temperature ? Number(saved.temperature) : null,
-      humidity: saved.humidity ? Number(saved.humidity) : null,
-      remarks: saved.remarks ? String(saved.remarks) : null,
-      createdAt: String(saved.createdAt),
-    }
-    // Final safety check: ensure ID is present and not null
-    if (!row.id || row.id === null || row.id === undefined) {
-      console.error("[DailyLogs] CRITICAL: ID is missing from row!", row)
-      throw new Error("Daily log ID is missing - cannot save. Generated ID was: " + logId)
-    }
-    
-    // CRITICAL: Double-check ID is set before insert
-    if (!row.id) {
-      // Last resort: generate new ID right before insert
-      row.id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-      console.warn("[DailyLogs] ID was missing, generated new one:", row.id)
-    }
-    
-    console.log("[DailyLogs] Inserting row with ID:", row.id, "Type:", typeof row.id, "Length:", row.id?.length)
-    console.log("[DailyLogs] Row preview:", { id: row.id, batchId: row.batchId, date: row.date, mortality: row.mortality })
-    console.log("[DailyLogs] Full row object keys:", Object.keys(row))
-    console.log("[DailyLogs] Row.id value:", row.id, "Is null?", row.id === null, "Is undefined?", row.id === undefined)
-    
-    // Create a fresh object to ensure ID is not lost
-    const insertPayload = {
-      id: String(row.id), // Force string conversion
-      batchId: String(row.batchId),
-      houseId: String(row.houseId),
-      sectionId: row.sectionId ? String(row.sectionId) : null,
-      sectionMortality: row.sectionMortality,
-      date: String(row.date),
-      openingBirds: Number(row.openingBirds),
-      mortality: Number(row.mortality),
-      closingBirds: Number(row.closingBirds),
-      feedTypeId: row.feedTypeId ? String(row.feedTypeId) : null,
-      cumulativeMortality: Number(row.cumulativeMortality),
-      cumulativeFeed: Number(row.cumulativeFeed),
-      cumulativeMortalityPercent: Number(row.cumulativeMortalityPercent),
-      cumulativeFCR: Number(row.cumulativeFCR),
-      temperature: row.temperature ? Number(row.temperature) : null,
-      humidity: row.humidity ? Number(row.humidity) : null,
-      remarks: row.remarks ? String(row.remarks) : null,
-      createdAt: String(row.createdAt),
-    }
-    
-    // Final check on insert payload
-    if (!insertPayload.id || insertPayload.id === 'null' || insertPayload.id === 'undefined') {
-      insertPayload.id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-      console.warn("[DailyLogs] Insert payload ID was invalid, regenerated:", insertPayload.id)
-    }
-    
-    console.log("[DailyLogs] Insert payload ID:", insertPayload.id)
-    
-    const { data, error } = await supabase.from("daily_logs").insert(insertPayload).select()
-    if (error) {
-      console.error("[DailyLogs] Insert error:", error)
-      console.error("[DailyLogs] Insert payload that failed:", JSON.stringify(insertPayload, null, 2))
-      console.error("[DailyLogs] Original row:", JSON.stringify(row, null, 2))
-      throw error
-    }
-    console.log("[DailyLogs] Successfully inserted:", data)
 
-    // Recalculate and update ALL logs for this batch to ensure the chain is perfect
+    console.log(`[DailyLogs] Updating ${recalc.length} logs for batch ${log.batchId}`)
+
+    // Update ALL logs for this batch to ensure the chain is perfect
     for (const r of recalc) {
-      const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }
-      await supabase.from("daily_logs").update(row).eq("id", r.id)
+      const updateRow = {
+        ...r,
+        sectionMortality: r.sectionMortality && typeof r.sectionMortality === 'object'
+          ? JSON.stringify(r.sectionMortality)
+          : r.sectionMortality
+      }
+      const { error: updateError } = await supabase.from("daily_logs").update(updateRow).eq("id", r.id)
+      if (updateError) {
+        console.error(`[DailyLogs] Failed to update log ${r.id}:`, updateError)
+      }
     }
 
     await fetchLogs()
+    const saved = recalc.find((l) => l.id === logId)
+    if (!saved) throw new Error("Failed to retrieve saved log after recalculation")
     return saved
   }
 
@@ -281,7 +224,12 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
 
     // Update ALL logs in the batch to ensure the chain is correct
     for (const r of recalc) {
-      const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }
+      const row = {
+        ...r,
+        sectionMortality: r.sectionMortality && typeof r.sectionMortality === 'object'
+          ? JSON.stringify(r.sectionMortality)
+          : r.sectionMortality
+      }
       const { error } = await supabase.from("daily_logs").update(row).eq("id", r.id)
       if (error) throw error
     }
@@ -303,7 +251,12 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
     )
     for (const r of recalc) {
-      const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }
+      const row = {
+        ...r,
+        sectionMortality: r.sectionMortality && typeof r.sectionMortality === 'object'
+          ? JSON.stringify(r.sectionMortality)
+          : r.sectionMortality
+      }
       await supabase.from("daily_logs").update(row).eq("id", r.id)
     }
     await fetchLogs()

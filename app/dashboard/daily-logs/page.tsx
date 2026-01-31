@@ -534,20 +534,42 @@ export default function DailyLogsPage() {
                           Bird Count Summary
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="grid grid-cols-3 gap-4 py-3 px-4">
-                        <div className="space-y-1">
-                          <p className="text-xs text-slate-500 uppercase font-semibold">Opening</p>
-                          <p className="text-xl font-bold text-slate-900">{openingBirds.toLocaleString("en-IN")}</p>
+                      <CardContent className="py-3 px-4 space-y-4">
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">Opening</p>
+                            <p className="text-xl font-bold text-slate-900">{openingBirds.toLocaleString("en-IN")}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">Mortality</p>
+                            <p className="text-xl font-bold text-red-600">-{finalMortality}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">Closing</p>
+                            <p className="text-xl font-bold text-green-700">
+                              {(openingBirds - finalMortality).toLocaleString("en-IN")}
+                            </p>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-slate-500 uppercase font-semibold">Mortality</p>
-                          <p className="text-xl font-bold text-red-600">-{finalMortality}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-slate-500 uppercase font-semibold">Closing</p>
-                          <p className="text-xl font-bold text-green-700">
-                            {(openingBirds - finalMortality).toLocaleString("en-IN")}
-                          </p>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200">
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 uppercase font-semibold">Cumulative Mortality</p>
+                            <p className="text-sm font-bold text-slate-700">
+                              {((yesterdayLog?.cumulativeMortality || 0) + finalMortality).toLocaleString("en-IN")} birds
+                              <span className="text-xs font-normal text-slate-500 ml-1">
+                                ({selectedBatch.initialBirds > 0
+                                  ? (((yesterdayLog?.cumulativeMortality || 0) + finalMortality) / selectedBatch.initialBirds * 100).toFixed(2)
+                                  : 0}%)
+                              </span>
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 uppercase font-semibold">Current Batch Age</p>
+                            <p className="text-sm font-bold text-slate-700">
+                              {Math.floor((new Date(formData.date).getTime() - new Date(selectedBatch.startDate).getTime()) / (1000 * 60 * 60 * 24))} Days
+                            </p>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -833,11 +855,11 @@ export default function DailyLogsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Farm</TableHead>
-                  <TableHead>House</TableHead>
+                  <TableHead>Farm/House</TableHead>
                   <TableHead>Mortality</TableHead>
+                  <TableHead>Cum. Mort %</TableHead>
                   <TableHead>Feed Type</TableHead>
-                  <TableHead>Closing Birds</TableHead>
+                  <TableHead>Closing</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -852,9 +874,16 @@ export default function DailyLogsPage() {
                   sortedLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap">{formatIndianDate(log.date)}</TableCell>
-                      <TableCell>{getFarmName(log.houseId)}</TableCell>
-                      <TableCell>{getHouseName(log.houseId)}</TableCell>
+                      <TableCell>
+                        <div className="text-xs text-muted-foreground">{getFarmName(log.houseId)}</div>
+                        <div className="font-medium">{getHouseName(log.houseId)}</div>
+                      </TableCell>
                       <TableCell>{log.mortality}</TableCell>
+                      <TableCell>
+                        <span className={`text-xs ${log.cumulativeMortalityPercent > 5 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>
+                          {log.cumulativeMortalityPercent.toFixed(2)}%
+                        </span>
+                      </TableCell>
                       <TableCell>{getFeedTypeName(log.feedTypeId)}</TableCell>
                       <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
                       <TableCell>
