@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
-import { useDailyLogs, type DailyLog } from "@/lib/daily-logs-context"
+import { useDailyLogs, type DailyLog, toDateKey } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -328,7 +328,18 @@ export default function DailyLogsPage() {
     if (!house) return false
     return farms.some((f) => f.id === house.farmId)
   })
-  const sortedLogs = [...accessibleLogs].sort((a, b) => b.date.localeCompare(a.date))
+  const sortedLogs = [...accessibleLogs].sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+
+  // Calculate summary metrics for the current view
+  const summaryMetrics = {
+    totalMortality: sortedLogs.reduce((sum, log) => sum + log.mortality, 0),
+    latestClosingBirds: sortedLogs.length > 0 ? sortedLogs[0].closingBirds : 0,
+    latestCumMortalityPercent: sortedLogs.length > 0 ? sortedLogs[0].cumulativeMortalityPercent : 0,
+    daysLogged: sortedLogs.length,
+    avgMortalityPerDay: sortedLogs.length > 0
+      ? sortedLogs.reduce((sum, log) => sum + log.mortality, 0) / sortedLogs.length
+      : 0
+  }
 
   const startAddNewLog = () => {
     setEditingLog(null)
@@ -807,7 +818,7 @@ export default function DailyLogsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Farm/House</TableHead>
+                  <TableHead className="text-center">Farm/House</TableHead>
                   <TableHead>Mortality</TableHead>
                   <TableHead>Cum. Mort %</TableHead>
                   <TableHead>Feed Type</TableHead>
@@ -827,8 +838,14 @@ export default function DailyLogsPage() {
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap">{formatIndianDate(log.date)}</TableCell>
                       <TableCell>
-                        <div className="text-xs text-muted-foreground">{getFarmName(log.houseId)}</div>
-                        <div className="font-medium">{getHouseName(log.houseId)}</div>
+                        <div className="flex flex-col items-center justify-center text-center leading-tight">
+                          <div className="text-xs font-semibold text-slate-700 uppercase tracking-tight">
+                            {getFarmName(log.houseId)}
+                          </div>
+                          <div className="text-sm font-medium text-muted-foreground">
+                            {getHouseName(log.houseId)}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>{log.mortality}</TableCell>
                       <TableCell>
@@ -839,7 +856,7 @@ export default function DailyLogsPage() {
                       <TableCell>{getFeedTypeName(log.feedTypeId)}</TableCell>
                       <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           {user?.role === "owner" && (
                             <>
                               <Button variant="outline" size="sm" onClick={() => handleEdit(log)}>
@@ -858,6 +875,55 @@ export default function DailyLogsPage() {
               </TableBody>
             </Table>
           </div>
+
+          {sortedLogs.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-2">
+                Batch Summary (Filtered)
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Total Mortality</p>
+                  <p className="text-xl font-bold text-red-600">
+                    {summaryMetrics.totalMortality.toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">Birds lost so far</p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Closing Birds</p>
+                  <p className="text-xl font-bold text-slate-900">
+                    {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">Current population</p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Cum. Mortality %</p>
+                  <p className="text-xl font-bold text-orange-600">
+                    {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">Of initial batch size</p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Days Logged</p>
+                  <p className="text-xl font-bold text-slate-900">
+                    {summaryMetrics.daysLogged}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">Total entries recorded</p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Avg. Mortality/Day</p>
+                  <p className="text-xl font-bold text-slate-900">
+                    {summaryMetrics.avgMortalityPerDay.toFixed(1)}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">Birds per day average</p>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
