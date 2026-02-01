@@ -359,19 +359,19 @@ export default function DailyLogsPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Daily Logs</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Track daily activities and metrics for your broiler flocks</p>
+          <h1 className="text-xl font-bold">Daily Logs</h1>
+          <p className="text-[10px] text-muted-foreground">Track daily activities and metrics for your broiler flocks</p>
         </div>
         <div className="flex gap-2">
           {user && user.role === "owner" && (
             <Dialog open={isWeeklyFeedDialogOpen} onOpenChange={setIsWeeklyFeedDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Weekly Feed Entry
+                <Button variant="outline" size="sm" className="h-8 text-[11px]">
+                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                  Weekly Feed
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
@@ -474,8 +474,8 @@ export default function DailyLogsPage() {
           {user && (user.role === "owner" || user.role === "manager") && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={startAddNewLog}>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button onClick={startAddNewLog} size="sm" className="h-8 text-[11px]">
+                  <Plus className="h-3.5 w-3.5 mr-1" />
                   Add Daily Log
                 </Button>
               </DialogTrigger>
@@ -724,21 +724,21 @@ export default function DailyLogsPage() {
 
       {weeklyFeeds.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Weekly Feed Entries</CardTitle>
-            <CardDescription>Feed consumption records by week</CardDescription>
+          <CardHeader className="py-2 px-4 border-b">
+            <CardTitle className="text-sm font-bold">Weekly Feed Entries</CardTitle>
+            <CardDescription className="text-[10px]">Feed consumption records by week</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>House</TableHead>
-                    <TableHead>Week Start</TableHead>
-                    <TableHead>Week End</TableHead>
-                    <TableHead>Total Feed (kg)</TableHead>
-                    <TableHead>Avg Weight (kg)</TableHead>
-                    {user?.role === "owner" && <TableHead className="text-center">Actions</TableHead>}
+                  <TableRow className="h-8 bg-slate-50/50">
+                    <TableHead className="text-[10px] h-8">House</TableHead>
+                    <TableHead className="text-[10px] h-8">Week Start</TableHead>
+                    <TableHead className="text-[10px] h-8">Week End</TableHead>
+                    <TableHead className="text-[10px] h-8 text-right">Total Feed (kg)</TableHead>
+                    <TableHead className="text-[10px] h-8 text-right">Avg Weight (kg)</TableHead>
+                    {user?.role === "owner" && <TableHead className="text-center text-[10px] h-8">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -750,24 +750,25 @@ export default function DailyLogsPage() {
                     })
                     .sort((a, b) => b.weekEnd.localeCompare(a.weekEnd))
                     .map((feed) => (
-                      <TableRow key={feed.id}>
-                        <TableCell>{getHouseName(feed.houseId)}</TableCell>
-                        <TableCell>{formatIndianDate(feed.weekStart)}</TableCell>
-                        <TableCell>{formatIndianDate(feed.weekEnd)}</TableCell>
-                        <TableCell className="font-semibold">{(feed.totalFeedKg || 0).toFixed(1)} kg</TableCell>
-                        <TableCell className="font-semibold">{(feed.averageWeightKg || 0).toFixed(2)} kg</TableCell>
+                      <TableRow key={feed.id} className="h-9">
+                        <TableCell className="text-[11px] py-1">{getHouseName(feed.houseId)}</TableCell>
+                        <TableCell className="text-[11px] py-1">{formatIndianDate(feed.weekStart)}</TableCell>
+                        <TableCell className="text-[11px] py-1">{formatIndianDate(feed.weekEnd)}</TableCell>
+                        <TableCell className="text-[11px] py-1 font-semibold text-right">{(feed.totalFeedKg || 0).toFixed(1)} kg</TableCell>
+                        <TableCell className="text-[11px] py-1 font-semibold text-right">{(feed.averageWeightKg || 0).toFixed(2)} kg</TableCell>
                         {user?.role === "owner" && (
-                          <TableCell>
+                          <TableCell className="text-center py-1">
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="h-6 w-6 p-0"
                               onClick={() => {
                                 if (confirm("Delete this weekly feed entry?")) {
                                   deleteWeeklyFeed(feed.id)
                                 }
                               }}
                             >
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                              <Trash2 className="h-3 w-3 text-red-600" />
                             </Button>
                           </TableCell>
                         )}
@@ -780,37 +781,28 @@ export default function DailyLogsPage() {
         </Card>
       )}
 
-      <Card className="mb-3">
-        <CardHeader className="py-3 px-4">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Filter className="h-4 w-4" />
-            Filter Logs
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="py-3 px-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium">Filter by House</label>
+      <Card>
+        <CardHeader className="py-2 px-4 flex flex-row items-center justify-between space-y-0 border-b">
+          <div className="flex flex-col">
+            <CardTitle className="text-sm font-bold">Daily Logs History</CardTitle>
+            <CardDescription className="text-[10px] hidden sm:block">View recorded daily metrics</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-3 w-3 text-muted-foreground" />
             <Select value={filterHouse} onValueChange={setFilterHouse}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
+              <SelectTrigger className="h-7 w-[140px] text-[10px] bg-slate-50">
+                <SelectValue placeholder="All Houses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Houses</SelectItem>
+                <SelectItem value="all" className="text-[10px]">All Houses</SelectItem>
                 {houses.map((house) => (
-                  <SelectItem key={house.id} value={house.id}>
-                    {house.name} - {getFarmName(house.id)}
+                  <SelectItem key={house.id} value={house.id} className="text-[10px]">
+                    {house.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="py-3 px-4">
-          <CardTitle className="text-sm">Daily Logs History</CardTitle>
-          <CardDescription className="text-[10px]">View all recorded daily logs for your batches</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -897,49 +889,44 @@ export default function DailyLogsPage() {
           </div>
 
           {sortedLogs.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-200 px-4 pb-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 px-1">
+            <div className="mt-1 pt-1 border-t border-slate-100 px-2 pb-2">
+              <h3 className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1 px-1">
                 Batch Summary (Filtered)
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase">Total Mortality</p>
-                  <p className="text-lg font-bold text-red-600">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
+                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Total Mortality</p>
+                  <p className="text-sm font-bold text-red-600">
                     {summaryMetrics.totalMortality.toLocaleString("en-IN")}
                   </p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Birds lost so far</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase">Closing Birds</p>
-                  <p className="text-lg font-bold text-slate-900">
+                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Closing Birds</p>
+                  <p className="text-sm font-bold text-slate-900">
                     {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
                   </p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Current population</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase">Cum. Mortality %</p>
-                  <p className="text-lg font-bold text-orange-600">
+                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Cum. Mortality %</p>
+                  <p className="text-sm font-bold text-orange-600">
                     {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
                   </p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Of initial batch size</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase">Days Logged</p>
-                  <p className="text-lg font-bold text-slate-900">
+                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Days Logged</p>
+                  <p className="text-sm font-bold text-slate-900">
                     {summaryMetrics.daysLogged}
                   </p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Total entries recorded</p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase">Avg. Mortality/Day</p>
-                  <p className="text-lg font-bold text-slate-900">
+                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Avg. Mortality/Day</p>
+                  <p className="text-sm font-bold text-slate-900">
                     {summaryMetrics.avgMortalityPerDay.toFixed(1)}
                   </p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Birds per day average</p>
                 </div>
               </div>
             </div>
