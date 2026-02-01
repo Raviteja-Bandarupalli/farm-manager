@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
-import { useDailyLogs, type DailyLog, toDateKey } from "@/lib/daily-logs-context"
+import { useDailyLogs, type DailyLog } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -526,54 +526,6 @@ export default function DailyLogsPage() {
                     />
                     <p className="text-xs text-muted-foreground">Selected: {formatIndianDate(formData.date)}</p>
                   </div>
-
-                  {selectedBatch && (
-                    <Card className="bg-slate-50 border-slate-200">
-                      <CardHeader className="py-3 px-4">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                          Bird Count Summary
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="py-3 px-4 space-y-4">
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-1">
-                            <p className="text-xs text-slate-500 uppercase font-semibold">Opening</p>
-                            <p className="text-xl font-bold text-slate-900">{openingBirds.toLocaleString("en-IN")}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs text-slate-500 uppercase font-semibold">Mortality</p>
-                            <p className="text-xl font-bold text-red-600">-{finalMortality}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs text-slate-500 uppercase font-semibold">Closing</p>
-                            <p className="text-xl font-bold text-green-700">
-                              {(openingBirds - finalMortality).toLocaleString("en-IN")}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200">
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-slate-500 uppercase font-semibold">Cumulative Mortality</p>
-                            <p className="text-sm font-bold text-slate-700">
-                              {((yesterdayLog?.cumulativeMortality || 0) + finalMortality).toLocaleString("en-IN")} birds
-                              <span className="text-xs font-normal text-slate-500 ml-1">
-                                ({selectedBatch.initialBirds > 0
-                                  ? (((yesterdayLog?.cumulativeMortality || 0) + finalMortality) / selectedBatch.initialBirds * 100).toFixed(2)
-                                  : 0}%)
-                              </span>
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-slate-500 uppercase font-semibold">Current Batch Age</p>
-                            <p className="text-sm font-bold text-slate-700">
-                              {Math.floor((toDateKey(formData.date) - toDateKey(selectedBatch.placementDate)) / (1000 * 60 * 60 * 24))} Days
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
 
                   {selectedBatch && (
                     <Alert className="bg-blue-50 border-blue-200">
