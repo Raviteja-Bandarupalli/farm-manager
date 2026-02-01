@@ -360,10 +360,10 @@ export default function DailyLogsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-3xl font-bold">Daily Logs</h1>
-          <p className="text-muted-foreground mt-1">Track daily activities and metrics for your broiler flocks</p>
+          <h1 className="text-2xl font-bold">Daily Logs</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Track daily activities and metrics for your broiler flocks</p>
         </div>
         <div className="flex gap-2">
           {user && user.role === "owner" && (
@@ -780,18 +780,18 @@ export default function DailyLogsPage() {
         </Card>
       )}
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+      <Card className="mb-3">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Filter className="h-4 w-4" />
             Filter Logs
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Filter by House</label>
+        <CardContent className="py-3 px-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Filter by House</label>
             <Select value={filterHouse} onValueChange={setFilterHouse}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -808,22 +808,22 @@ export default function DailyLogsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Daily Logs History</CardTitle>
-          <CardDescription>View all recorded daily logs for your batches</CardDescription>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm">Daily Logs History</CardTitle>
+          <CardDescription className="text-[10px]">View all recorded daily logs for your batches</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table className="table-fixed w-full border-collapse">
               <TableHeader>
-                <TableRow className="bg-slate-50/50 h-14">
-                  <TableHead className="w-[15%] font-bold text-slate-700 align-middle">Date</TableHead>
-                  <TableHead className="w-[20%] font-bold text-slate-700 text-center align-middle">Farm/House</TableHead>
-                  <TableHead className="w-[10%] font-bold text-slate-700 align-middle">Mortality</TableHead>
-                  <TableHead className="w-[15%] font-bold text-slate-700 align-middle">Cum. Mort %</TableHead>
-                  <TableHead className="w-[15%] font-bold text-slate-700 align-middle">Feed Type</TableHead>
-                  <TableHead className="w-[15%] font-bold text-slate-700 align-middle">Closing</TableHead>
-                  <TableHead className="w-[10%] font-bold text-slate-700 text-center align-middle">Actions</TableHead>
+                <TableRow className="bg-slate-50/50 h-10">
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Date</TableHead>
+                  <TableHead className="w-[20%] font-bold text-slate-700 text-xs text-center align-middle">Farm/House</TableHead>
+                  <TableHead className="w-[10%] font-bold text-slate-700 text-xs align-middle">Mortality</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Cum. Mort %</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Feed Type</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Closing</TableHead>
+                  <TableHead className="w-[10%] font-bold text-slate-700 text-xs text-center align-middle">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -835,55 +835,55 @@ export default function DailyLogsPage() {
                   </TableRow>
                 ) : (
                   sortedLogs.map((log) => (
-                    <TableRow key={log.id} className="hover:bg-slate-50 transition-colors h-20">
-                      <TableCell className="whitespace-nowrap align-middle py-0">
+                    <TableRow key={log.id} className="hover:bg-slate-50 transition-colors h-11">
+                      <TableCell className="whitespace-nowrap align-middle py-0 text-xs">
                         {formatIndianDate(log.date)}
                       </TableCell>
                       <TableCell className="align-middle py-0">
-                        <div className="flex flex-col items-center justify-center text-center leading-tight">
-                          <div className="text-[11px] font-bold text-slate-800 uppercase tracking-tight mb-0.5">
+                        <div className="flex flex-col items-center justify-center text-center leading-none">
+                          <div className="text-[9px] font-bold text-slate-700 uppercase tracking-tighter">
                             {getFarmName(log.houseId)}
                           </div>
-                          <div className="text-sm font-medium text-slate-500">
+                          <div className="text-xs font-medium text-slate-500">
                             {getHouseName(log.houseId)}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="align-middle py-0 font-medium">
+                      <TableCell className="align-middle py-0 text-xs font-medium">
                         {log.mortality}
                       </TableCell>
                       <TableCell className="align-middle py-0">
-                        <span className={`text-sm font-semibold ${log.cumulativeMortalityPercent > 5 ? 'text-red-600' : 'text-slate-600'}`}>
+                        <span className={`text-xs font-semibold ${log.cumulativeMortalityPercent > 5 ? 'text-red-600' : 'text-slate-600'}`}>
                           {log.cumulativeMortalityPercent.toFixed(2)}%
                         </span>
                       </TableCell>
-                      <TableCell className="align-middle py-0 text-sm text-slate-600 truncate">
+                      <TableCell className="align-middle py-0 text-[11px] text-slate-600 truncate">
                         {getFeedTypeName(log.feedTypeId)}
                       </TableCell>
-                      <TableCell className="align-middle py-0 font-bold text-slate-900">
+                      <TableCell className="align-middle py-0 text-xs font-bold text-slate-900">
                         {log.closingBirds.toLocaleString("en-IN")}
                       </TableCell>
                       <TableCell className="align-middle py-0">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1.5">
                           {user?.role === "owner" && (
                             <>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-8 w-8 p-0"
+                                className="h-7 w-7 p-0"
                                 onClick={() => handleEdit(log)}
                                 title="Edit Log"
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                className="h-8 w-8 p-0"
+                                className="h-7 w-7 p-0"
                                 onClick={() => handleDelete(log.id)}
                                 title="Delete Log"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           )}
@@ -897,49 +897,49 @@ export default function DailyLogsPage() {
           </div>
 
           {sortedLogs.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-slate-200">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-2">
+            <div className="mt-4 pt-4 border-t border-slate-200 px-4 pb-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 px-1">
                 Batch Summary (Filtered)
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Total Mortality</p>
-                  <p className="text-xl font-bold text-red-600">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase">Total Mortality</p>
+                  <p className="text-lg font-bold text-red-600">
                     {summaryMetrics.totalMortality.toLocaleString("en-IN")}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">Birds lost so far</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Birds lost so far</p>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Closing Birds</p>
-                  <p className="text-xl font-bold text-slate-900">
+                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase">Closing Birds</p>
+                  <p className="text-lg font-bold text-slate-900">
                     {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">Current population</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Current population</p>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Cum. Mortality %</p>
-                  <p className="text-xl font-bold text-orange-600">
+                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase">Cum. Mortality %</p>
+                  <p className="text-lg font-bold text-orange-600">
                     {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">Of initial batch size</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Of initial batch size</p>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Days Logged</p>
-                  <p className="text-xl font-bold text-slate-900">
+                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase">Days Logged</p>
+                  <p className="text-lg font-bold text-slate-900">
                     {summaryMetrics.daysLogged}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">Total entries recorded</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Total entries recorded</p>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Avg. Mortality/Day</p>
-                  <p className="text-xl font-bold text-slate-900">
+                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase">Avg. Mortality/Day</p>
+                  <p className="text-lg font-bold text-slate-900">
                     {summaryMetrics.avgMortalityPerDay.toFixed(1)}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">Birds per day average</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Birds per day average</p>
                 </div>
               </div>
             </div>
