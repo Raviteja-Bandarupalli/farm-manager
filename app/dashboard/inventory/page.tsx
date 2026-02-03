@@ -380,11 +380,11 @@ export default function InventoryPage() {
   const totalValue = items.reduce((sum, item) => sum + item.currentStock * item.averageCost, 0)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Inventory Management</h1>
-          <p className="text-xs text-muted-foreground">Track items, purchases, and issues for your broiler farm</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Inventory</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Track items, purchases, and issues</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isItemDialogOpen} onOpenChange={(open) => {
@@ -726,13 +726,12 @@ export default function InventoryPage() {
       </div>
 
       {lowStockItems.length > 0 && (
-        <Card className="border-orange-500 shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-orange-50/30">
-            <CardTitle className="flex items-center gap-2 text-sm font-bold text-orange-700">
-              <AlertTriangle className="h-4 w-4" />
-              Low Stock Alert
+        <Card className="border-orange-200 shadow-sm bg-orange-50/20">
+          <CardHeader className="py-1.5 px-3 border-b bg-orange-50/50">
+            <CardTitle className="flex items-center gap-2 text-xs font-bold text-orange-700">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Low Stock Alert ({lowStockItems.length})
             </CardTitle>
-            <CardDescription className="text-xs font-medium">{lowStockItems.length} items below reorder level</CardDescription>
           </CardHeader>
           <CardContent className="p-2">
             <div className="space-y-1.5">
@@ -759,39 +758,39 @@ export default function InventoryPage() {
         </Card>
       )}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Items</CardTitle>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Items</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold">{items.length}</div>
-            <p className="text-xs text-muted-foreground">Items in inventory</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black">{items.length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Items in inventory</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Value</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Value</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold text-blue-600">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
-            <p className="text-xs text-muted-foreground">Current inventory value</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-blue-600">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Current value</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Purchases</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Purchases</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold">{purchases.length}</div>
-            <p className="text-xs text-muted-foreground">Purchase entries recorded</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black">{purchases.length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Purchase entries</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
+      <Tabs value={activeTab} className="space-y-3" onValueChange={(value) => {
         setActiveTabState(value)
         if (typeof window !== "undefined") {
           const url = new URL(window.location.href)
@@ -805,16 +804,16 @@ export default function InventoryPage() {
           <TabsTrigger value="issues" className="text-xs h-7 font-bold">Issues</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="items" className="space-y-4">
-          <Card className="shadow-sm">
-            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+        <TabsContent value="items" className="space-y-3">
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
               <CardTitle className="text-sm font-bold">Item Master</CardTitle>
-              <CardDescription className="text-xs">Current stock and average cost</CardDescription>
+              <CardDescription className="text-[10px]">Current stock and average cost</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                   {items.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No items added yet</p>
+                <div className="text-center py-8">
+                  <p className="text-xs text-muted-foreground mb-3 font-medium">No items added yet</p>
                   <Button onClick={startAddNewItem}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Item
@@ -893,13 +892,13 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="purchases" className="space-y-4">
-          <Card className="shadow-sm">
-            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+        <TabsContent value="purchases" className="space-y-3">
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-bold">Purchase Entries</CardTitle>
-                  <CardDescription className="text-xs">All purchase transactions</CardDescription>
+                  <CardDescription className="text-[10px]">All purchase transactions</CardDescription>
                 </div>
                 {purchases.some((p) => !p.financeTransactionId) && (
                   <Button
@@ -916,8 +915,8 @@ export default function InventoryPage() {
             </CardHeader>
             <CardContent className="p-0">
               {purchases.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No purchases recorded yet</p>
+                <div className="text-center py-8">
+                  <p className="text-xs text-muted-foreground mb-3 font-medium">No purchases recorded yet</p>
                   <Button onClick={startAddNewPurchase}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Purchase Entry
@@ -999,17 +998,17 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="issues" className="space-y-4">
+        <TabsContent value="issues" className="space-y-3">
           {issues.length > 0 && (
-            <Card className="shadow-sm">
-              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-                <CardTitle className="text-sm font-bold">Issue Summary</CardTitle>
+            <Card className="shadow-sm border-slate-200/60 bg-blue-50/10">
+              <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+                <CardTitle className="text-xs font-bold">Issue Summary</CardTitle>
               </CardHeader>
-              <CardContent className="p-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3 bg-blue-50/50 rounded border border-blue-100 shadow-sm">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Feed Issued</p>
-                    <p className="text-xl font-extrabold text-blue-600">
+              <CardContent className="p-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="p-2.5 bg-white rounded border border-blue-100 shadow-sm">
+                    <p className="text-[9px] uppercase font-bold text-slate-500 mb-1">Total Feed Issued</p>
+                    <p className="text-lg font-black text-blue-600 leading-tight">
                       {issues
                         .filter((issue) => {
                           const item = getItemById(issue.itemId)
@@ -1020,9 +1019,9 @@ export default function InventoryPage() {
                       kg
                     </p>
                   </div>
-                  <div className="p-3 bg-green-50/50 rounded border border-green-100 shadow-sm">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Medicine & Vaccine Cost</p>
-                    <p className="text-xl font-extrabold text-green-600">
+                  <div className="p-2.5 bg-white rounded border border-green-100 shadow-sm">
+                    <p className="text-[9px] uppercase font-bold text-slate-500 mb-1">Total Med/Vacc Cost</p>
+                    <p className="text-lg font-black text-green-600 leading-tight">
                       ₹
                       {issues
                         .filter((issue) => {
@@ -1038,15 +1037,15 @@ export default function InventoryPage() {
             </Card>
           )}
 
-          <Card className="shadow-sm">
-            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
               <CardTitle className="text-sm font-bold">Issue History</CardTitle>
-              <CardDescription className="text-xs">{issues.length} total issues</CardDescription>
+              <CardDescription className="text-[10px]">{issues.length} total issues</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {issues.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No issues recorded yet</p>
+                <div className="text-center py-8">
+                  <p className="text-xs text-muted-foreground mb-3 font-medium">No issues recorded yet</p>
                   <Button onClick={() => setIsIssueDialogOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Issue Entry

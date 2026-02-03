@@ -52,18 +52,16 @@ export default function SalesPage() {
     remarks: "",
   })
 
-  const filteredSales =
-    selectedBuyerId === "all"
-      ? sales
-      : sales.filter((s) => s.buyerId === selectedBuyerId)
+  const filteredSales = (sales || [])
+    .filter((s) => selectedBuyerId === "all" || s.buyerId === selectedBuyerId)
 
-  const totalSales = sales.reduce((sum, s) => sum + s.totalValue, 0)
-  const totalBirdsSold = sales.reduce((sum, s) => sum + s.birds, 0)
-  const uniqueBuyers = new Set(sales.map((s) => s.buyerId)).size
+  const totalSales = (sales || []).reduce((sum, s) => sum + (s.totalValue || 0), 0)
+  const totalBirdsSold = (sales || []).reduce((sum, s) => sum + (s.birds || 0), 0)
+  const uniqueBuyers = new Set((sales || []).map((s) => s.buyerId)).size
 
-  const feedPurchaseExpenses = transactions
+  const feedPurchaseExpenses = (transactions || [])
     .filter((t) => t.type === "expense" && t.category === "Feed Purchase")
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
   const netRevenue = totalSales - feedPurchaseExpenses
 
   const liveWeightKg =
@@ -210,47 +208,47 @@ export default function SalesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Sales</h1>
-          <p className="text-xs text-muted-foreground">Record and manage broiler sales</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Sales</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Record and manage broiler sales</p>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Buyers</CardTitle>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Buyers</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold">{uniqueBuyers}</div>
-            <p className="text-xs text-muted-foreground">Buyers in system</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black">{uniqueBuyers}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Buyers in system</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Sales</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Sales</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold text-blue-600">₹{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
-            <p className="text-xs text-muted-foreground">Total sales value</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-blue-600">₹{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Total sales value</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Entries</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Entries</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold">{sales.length}</div>
-            <p className="text-xs text-muted-foreground">Sales entries recorded</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black">{(sales || []).length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Sales entries recorded</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <Card className="shadow-sm">
-          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+      <div className="space-y-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold">Sales History</CardTitle>
@@ -343,11 +341,11 @@ export default function SalesPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="flex items-center gap-4 py-2.5 px-4 bg-slate-50/30 border-b">
+            <div className="flex items-center gap-4 py-1.5 px-3 bg-slate-50/30 border-b">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-bold uppercase text-slate-500">Filter Buyer:</label>
+                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-tight">Filter Buyer:</label>
                 <Select value={selectedBuyerId} onValueChange={setSelectedBuyerId}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs bg-white font-medium">
+                  <SelectTrigger className="w-[180px] h-7 text-[11px] bg-white font-medium">
                     <SelectValue placeholder="All buyers" />
                   </SelectTrigger>
                   <SelectContent>
@@ -365,13 +363,13 @@ export default function SalesPage() {
             </div>
 
             {loading ? (
-              <div className="text-center py-12">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
-                <p className="text-muted-foreground mt-4">Loading sales...</p>
+              <div className="text-center py-8">
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                <p className="text-xs text-muted-foreground mt-3 font-medium">Loading sales...</p>
               </div>
             ) : filteredSales.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground mb-4">No sales recorded yet</p>
+              <div className="text-center py-8">
+                <p className="text-xs text-muted-foreground mb-3 font-medium">No sales recorded yet</p>
                 <Button onClick={startAddNewSale}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Sale

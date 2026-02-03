@@ -162,70 +162,65 @@ export default function DashboardPage() {
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="mb-2">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-xs text-muted-foreground">Overview of your poultry farm operations</p>
+        <h1 className="text-xl font-extrabold tracking-tight">Dashboard</h1>
+        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Farm overview</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2.5 px-4 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Farms</CardTitle>
-            <Building2 className="h-4 w-4 text-slate-400" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Farms</CardTitle>
+            <Building2 className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent className="p-4 pt-3">
-            <div className="text-2xl font-extrabold tracking-tight">{farms.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {activeHouses} active houses of {houses.length} total
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{farms.length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+              {activeHouses}/{houses.length} active houses
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2.5 px-4 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Live Birds</CardTitle>
-            <Activity className="h-4 w-4 text-slate-400" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Live Birds</CardTitle>
+            <Activity className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent className="p-4 pt-3">
-            <div className="text-2xl font-extrabold tracking-tight">{totalLiveBirds.toLocaleString("en-IN")}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{totalLiveBirds.toLocaleString("en-IN")}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
               {activeBatchCount} active batches
-              {getTotalBirdsSold() > 0 && ` • ${getTotalBirdsSold().toLocaleString("en-IN")} sold`}
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2.5 px-4 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">FCR & Mortality</CardTitle>
-            <TrendingUp className="h-4 w-4 text-slate-400" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Performance</CardTitle>
+            <TrendingUp className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent className="p-4 pt-3">
-            <div className={`text-2xl font-extrabold tracking-tight ${avgFCR <= avgTargetFCR ? "text-green-600" : "text-orange-600"}`}>
-              {avgFCR > 0 ? avgFCR.toFixed(2) : "N/A"} <span className="text-xs font-bold text-muted-foreground ml-1 uppercase">FCR</span>
+          <CardContent className="p-2.5">
+            <div className={`text-xl font-black tracking-tight ${avgFCR <= avgTargetFCR ? "text-green-600" : "text-orange-600"}`}>
+              {avgFCR > 0 ? avgFCR.toFixed(2) : "N/A"} <span className="text-[10px] font-bold text-muted-foreground uppercase ml-0.5">FCR</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Mortality: {(totalInitialBirds > 0 && dailyLogs.length > 0) || (dailyLogs.length > 0 && avgMortality > 0)
-                ? `${avgMortality.toFixed(2)}%` 
-                : dailyLogs.length === 0
-                  ? "N/A"
-                  : `${avgMortality.toFixed(2)}%`}
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+              Mortality: {avgMortality.toFixed(1)}%
             </p>
           </CardContent>
         </Card>
 
         {canAccessFinance(user) && (
           <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2.5 px-4 border-b bg-slate-50/50">
-              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
-              <DollarSign className="h-4 w-4 text-slate-400" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+              <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
+              <DollarSign className="h-3.5 w-3.5 text-slate-400 opacity-70" />
             </CardHeader>
-            <CardContent className="p-4 pt-3">
-              <div className={`text-2xl font-extrabold tracking-tight ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+            <CardContent className="p-2.5">
+              <div className={`text-xl font-black tracking-tight ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {formatINR(monthlyBalance)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">{monthlyBalance >= 0 ? "Profit" : "Loss"} this month</p>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{monthlyBalance >= 0 ? "Profit" : "Loss"} this month</p>
             </CardContent>
           </Card>
         )}
@@ -279,39 +274,38 @@ export default function DashboardPage() {
 
       {/* Sales Summary */}
       {(getTotalBirdsSold() > 0 || getTotalRevenue() > 0) && (
-        <Card className="border-green-200 shadow-sm">
-          <CardHeader className="py-2.5 px-4 border-b bg-green-50/50 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-green-800">
-              <DollarSign className="h-4 w-4" />
+        <Card className="border-green-200 shadow-sm bg-green-50/10">
+          <CardHeader className="py-1.5 px-3 border-b bg-green-50/50 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-green-800">
+              <DollarSign className="h-3 w-3" />
               Sales Summary
             </CardTitle>
-            <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px] font-bold">LIVE DATA</Badge>
           </CardHeader>
-          <CardContent className="p-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="p-4 bg-green-50/30 rounded-lg border border-green-100 shadow-sm">
-                <p className="text-[10px] uppercase font-bold text-green-600/80 mb-1 tracking-wider">Broilers Sold</p>
-                <p className="text-2xl font-extrabold text-green-700 tracking-tight">{getTotalBirdsSold().toLocaleString("en-IN")}</p>
+          <CardContent className="p-2.5">
+            <div className="grid gap-2.5 md:grid-cols-2">
+              <div className="p-2.5 bg-white rounded-lg border border-green-100 shadow-sm">
+                <p className="text-[9px] uppercase font-bold text-green-600/80 mb-0.5 tracking-wider">Broilers Sold</p>
+                <p className="text-lg font-black text-green-700 tracking-tight">{getTotalBirdsSold().toLocaleString("en-IN")}</p>
               </div>
-              <div className="p-4 bg-blue-50/30 rounded-lg border border-blue-100 shadow-sm">
-                <p className="text-[10px] uppercase font-bold text-blue-600/80 mb-1 tracking-wider">Total Revenue</p>
-                <p className="text-2xl font-extrabold text-blue-700 tracking-tight">{formatINR(getTotalRevenue())}</p>
+              <div className="p-2.5 bg-white rounded-lg border border-blue-100 shadow-sm">
+                <p className="text-[9px] uppercase font-bold text-blue-600/80 mb-0.5 tracking-wider">Total Revenue</p>
+                <p className="text-lg font-black text-blue-700 tracking-tight">{formatINR(getTotalRevenue())}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-            <CardTitle className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-slate-700">
-              <Home className="h-4 w-4 text-slate-500" />
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+              <Home className="h-3.5 w-3.5 text-slate-500 opacity-70" />
               Houses Overview
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 pt-3">
-            <div className="space-y-2.5">
+          <CardContent className="p-3">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-600">Total Houses</span>
                 <span className="text-sm font-extrabold text-slate-900">{houses.length}</span>
@@ -342,14 +336,14 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-            <CardTitle className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-slate-700">
-              <Users className="h-4 w-4 text-slate-500" />
-              Suppliers & Buyers
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+              <Users className="h-3.5 w-3.5 text-slate-500 opacity-70" />
+              Contacts
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 pt-3">
-            <div className="space-y-2.5">
+          <CardContent className="p-3">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-600">Total Suppliers</span>
                 <span className="text-sm font-extrabold text-slate-900">{suppliers.length}</span>
@@ -375,14 +369,14 @@ export default function DashboardPage() {
 
         {canAccessFinance(user) && (
           <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-              <CardTitle className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-slate-700">
-                <Package className="h-4 w-4 text-slate-500" />
-                Inventory Status
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                <Package className="h-3.5 w-3.5 text-slate-500 opacity-70" />
+                Inventory
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-3">
-              <div className="space-y-2.5">
+            <CardContent className="p-3">
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold text-slate-600">Total Items</span>
                   <span className="text-sm font-extrabold text-slate-900">{items.length}</span>
@@ -414,23 +408,23 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-            <CardTitle className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-slate-700">
-              <Activity className="h-4 w-4 text-slate-500" />
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+              <Activity className="h-3.5 w-3.5 text-slate-500 opacity-70" />
               Activity Summary
             </CardTitle>
-            <CardDescription className="text-[10px] font-medium text-slate-400">Last 30 days statistics</CardDescription>
+            <CardDescription className="text-[9px] font-medium text-slate-400">Last 30 days</CardDescription>
           </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-5">
+          <CardContent className="p-3">
+            <div className="space-y-4">
               <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Logs Recorded</span>
-                  <span className="font-extrabold text-lg text-primary tracking-tight">{recentLogs.length}</span>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Logs Recorded</span>
+                  <span className="font-black text-base text-primary tracking-tight">{recentLogs.length}</span>
                 </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full shadow-inner overflow-hidden">
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                   <div
                     className="bg-primary h-full rounded-full"
                     style={{ width: `${Math.min((recentLogs.length / 30) * 100, 100)}%` }}
@@ -438,18 +432,18 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-50/50 rounded-lg border border-slate-100 shadow-sm">
-                  <p className="text-[10px] text-slate-500 uppercase font-extrabold mb-1 tracking-wider">Total Mortality</p>
-                  <p className="text-xl font-extrabold text-red-600 tracking-tight">{totalMortality}</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-2.5 bg-slate-50/50 rounded-lg border border-slate-100 shadow-sm">
+                  <p className="text-[9px] text-slate-400 uppercase font-bold mb-0.5 tracking-wider">Total Mortality</p>
+                  <p className="text-lg font-black text-red-600 tracking-tight">{totalMortality}</p>
                 </div>
-                <div className="p-3 bg-slate-50/50 rounded-lg border border-slate-100 shadow-sm">
-                  <p className="text-[10px] text-slate-500 uppercase font-extrabold mb-1 tracking-wider">Feed Consumed</p>
-                  <p className="text-xl font-extrabold text-slate-800 tracking-tight">{totalFeedConsumed.toFixed(1)} <span className="text-[10px] font-bold text-slate-400">kg</span></p>
+                <div className="p-2.5 bg-slate-50/50 rounded-lg border border-slate-100 shadow-sm">
+                  <p className="text-[9px] text-slate-400 uppercase font-bold mb-0.5 tracking-wider">Feed Consumed</p>
+                  <p className="text-lg font-black text-slate-800 tracking-tight">{totalFeedConsumed.toFixed(0)} <span className="text-[9px] font-bold text-slate-400">kg</span></p>
                 </div>
               </div>
             </div>
-            <Button asChild variant="outline" className="w-full mt-5 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
+            <Button asChild variant="outline" className="w-full mt-4 h-7 text-[10px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
               <Link href="/dashboard/daily-logs">View All Logs</Link>
             </Button>
           </CardContent>
@@ -457,32 +451,32 @@ export default function DashboardPage() {
 
         {canAccessFinance(user) && (
           <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-              <CardTitle className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 text-slate-700">
-                <DollarSign className="h-4 w-4 text-slate-500" />
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                <DollarSign className="h-3.5 w-3.5 text-slate-500 opacity-70" />
                 Financial Summary
               </CardTitle>
-              <CardDescription className="text-[10px] font-medium text-slate-400">Current month performance</CardDescription>
+              <CardDescription className="text-[9px] font-medium text-slate-400">Current month</CardDescription>
             </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-5">
+            <CardContent className="p-3">
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Income</span>
-                      <span className="font-extrabold text-xs text-green-600">{formatINR(monthlyIncome)}</span>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Income</span>
+                      <span className="font-bold text-[11px] text-green-600">{formatINR(monthlyIncome)}</span>
                     </div>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
                       <div className="bg-green-600 h-full rounded-full" style={{ width: "100%" }} />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Expenses</span>
-                      <span className="font-extrabold text-xs text-red-600">{formatINR(monthlyExpenses)}</span>
+                      <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Expenses</span>
+                      <span className="font-bold text-[11px] text-red-600">{formatINR(monthlyExpenses)}</span>
                     </div>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden shadow-inner">
+                    <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
                       <div
                         className="bg-red-600 h-full rounded-full"
                         style={{
@@ -493,19 +487,16 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Net Balance</span>
-                    <p className={`font-extrabold text-2xl tracking-tight leading-tight ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-end">
+                  <div className="space-y-0">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Net Balance</span>
+                    <p className={`font-black text-xl tracking-tight leading-tight ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {formatINR(monthlyBalance)}
                     </p>
                   </div>
-                  <Badge variant="outline" className={`text-[10px] font-extrabold uppercase px-2 py-0.5 ${monthlyBalance >= 0 ? "text-green-600 border-green-200 bg-green-50" : "text-red-600 border-red-200 bg-red-50"}`}>
-                    {monthlyBalance >= 0 ? "PROFITABLE" : "LOSS"}
-                  </Badge>
                 </div>
               </div>
-              <Button asChild variant="outline" className="w-full mt-5 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
+              <Button asChild variant="outline" className="w-full mt-4 h-7 text-[10px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
                 <Link href="/dashboard/finance">View Finances</Link>
               </Button>
             </CardContent>
@@ -514,13 +505,12 @@ export default function DashboardPage() {
       </div>
 
       <Card className="shadow-sm border-slate-200/60">
-        <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
-          <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Quick Actions</CardTitle>
-          <CardDescription className="text-[10px] font-medium text-slate-400">Common tasks and shortcuts</CardDescription>
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="p-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button asChild variant="outline" className="w-full h-10 text-xs font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">
+        <CardContent className="p-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Button asChild variant="outline" className="w-full h-8 text-[10px] font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">
               <Link href="/dashboard/daily-logs">Add Daily Log</Link>
             </Button>
             <Button asChild variant="outline" className="w-full h-10 text-xs font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">

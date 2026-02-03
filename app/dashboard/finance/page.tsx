@@ -177,11 +177,11 @@ export default function FinancePage() {
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Finance Tracking</h1>
-          <p className="text-xs text-muted-foreground">Monitor income, expenses, and financial performance</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Finance Tracking</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Monitor income, expenses, and financial performance</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -293,17 +293,17 @@ export default function FinancePage() {
         </Dialog>
       </div>
 
-      <Card className="shadow-sm">
-        <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
           <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-slate-400" />
+            <Calendar className="h-3.5 w-3.5 text-slate-400" />
             Filter Period
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
+        <CardContent className="p-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-slate-500 tracking-tight">Start Date</label>
               <Input
                 type="date"
                 className="h-9 text-sm"
@@ -325,70 +325,68 @@ export default function FinancePage() {
       </Card>
 
       {(feedCostFromIssues > 0 || medCostFromIssues > 0) && (
-        <Card className="shadow-sm border-blue-200">
-          <CardHeader className="py-2 px-3 border-b bg-blue-50/30">
-            <CardTitle className="text-sm font-bold">Cost from Inventory Issues</CardTitle>
-            <CardDescription className="text-[10px]">Costs calculated from usage records</CardDescription>
+        <Card className="shadow-sm border-blue-200 bg-blue-50/20">
+          <CardHeader className="py-1.5 px-3 border-b bg-blue-50/50">
+            <CardTitle className="text-xs font-bold text-blue-800">Inventory Costs</CardTitle>
           </CardHeader>
           <CardContent className="p-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="p-2 bg-blue-50/50 rounded border border-blue-100">
-                <p className="text-[10px] text-muted-foreground mb-0.5">Feed Usage Cost</p>
-                <p className="text-lg font-bold text-blue-600">{formatINR(feedCostFromIssues)}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-white rounded border border-blue-100 shadow-sm">
+                <p className="text-[9px] font-bold text-slate-500 uppercase">Feed Usage</p>
+                <p className="text-lg font-black text-blue-600 leading-tight">{formatINR(feedCostFromIssues)}</p>
               </div>
-              <div className="p-2 bg-green-50/50 rounded border border-green-100">
-                <p className="text-[10px] text-muted-foreground mb-0.5">Medicine/Vaccine Usage Cost</p>
-                <p className="text-lg font-bold text-green-600">{formatINR(medCostFromIssues)}</p>
+              <div className="p-2 bg-white rounded border border-green-100 shadow-sm">
+                <p className="text-[9px] font-bold text-slate-500 uppercase">Med Usage</p>
+                <p className="text-lg font-black text-green-600 leading-tight">{formatINR(medCostFromIssues)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Income</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Income</CardTitle>
+            <TrendingUp className="h-3.5 w-3.5 text-green-600 opacity-70" />
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold text-green-600">{formatINR(totalIncome)}</div>
-            <p className="text-xs text-muted-foreground mt-0.5">Total received</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-green-600">{formatINR(totalIncome)}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Total received</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenses</CardTitle>
+            <TrendingDown className="h-3.5 w-3.5 text-red-600 opacity-70" />
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="text-2xl font-extrabold text-red-600">{formatINR(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground mt-0.5">Total paid out</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-red-600">{formatINR(totalExpenses)}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Total paid out</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Net Balance</CardTitle>
-            <DollarSign className="h-4 w-4 text-slate-400" />
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
+            <DollarSign className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent className="p-3">
-            <div className={`text-2xl font-extrabold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+          <CardContent className="p-2.5">
+            <div className={`text-xl font-black ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
               {formatINR(balance)}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{balance >= 0 ? "Surplus" : "Deficit"}</p>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{balance >= 0 ? "Surplus" : "Deficit"}</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-sm font-bold">Income by Category</CardTitle>
-            <CardDescription className="text-[10px]">Breakdown of sources</CardDescription>
+      <div className="grid gap-2 md:grid-cols-2">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-xs font-bold">Income by Category</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
+          <CardContent className="p-2.5">
             {Object.keys(incomeByCategory).length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-4">No income recorded</p>
             ) : (
@@ -446,15 +444,15 @@ export default function FinancePage() {
         </Card>
       </div>
 
-      <Card className="shadow-sm">
-        <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
           <CardTitle className="text-sm font-bold">Transaction History</CardTitle>
-          <CardDescription className="text-xs">{sortedTransactions.length} transactions in period</CardDescription>
+          <CardDescription className="text-[10px]">{sortedTransactions.length} transactions in period</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {sortedTransactions.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No transactions recorded yet</p>
+            <div className="text-center py-8">
+              <p className="text-xs text-muted-foreground mb-3 font-medium">No transactions recorded yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First Transaction
