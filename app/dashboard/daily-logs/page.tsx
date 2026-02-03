@@ -723,8 +723,8 @@ export default function DailyLogsPage() {
       </div>
 
       {weeklyFeeds.length > 0 && (
-        <Card>
-          <CardHeader className="py-2 px-4 border-b">
+        <Card className="shadow-sm">
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
             <CardTitle className="text-sm font-bold">Weekly Feed Entries</CardTitle>
             <CardDescription className="text-[10px]">Feed consumption records by week</CardDescription>
           </CardHeader>
@@ -781,8 +781,8 @@ export default function DailyLogsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="py-2 px-4 flex flex-row items-center justify-between space-y-0 border-b">
+      <Card className="shadow-sm">
+        <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/50">
           <div className="flex flex-col">
             <CardTitle className="text-sm font-bold">Daily Logs History</CardTitle>
             <CardDescription className="text-[10px] hidden sm:block">View recorded daily metrics</CardDescription>

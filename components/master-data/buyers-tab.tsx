@@ -49,17 +49,19 @@ export function BuyersTab() {
   }
 
   return (
-    <div>
-      <div className="flex justify-end mb-4">
+    <div className="space-y-3">
+      <div className="flex justify-end">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
+              size="sm"
+              className="h-8 text-[11px]"
               onClick={() => {
                 setEditingId(null)
                 setFormData({ name: "", contact: "", address: "" })
               }}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-3.5 w-3.5 mr-1" />
               Add Buyer
             </Button>
           </DialogTrigger>
@@ -101,10 +103,10 @@ export function BuyersTab() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
         {buyers.length === 0 ? (
-          <Card className="col-span-full">
-            <CardContent className="flex flex-col items-center justify-center py-12">
+          <Card className="col-span-full shadow-sm">
+            <CardContent className="flex flex-col items-center justify-center py-8">
               <p className="text-muted-foreground mb-4">No buyers added yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -114,19 +116,19 @@ export function BuyersTab() {
           </Card>
         ) : (
           buyers.map((buyer) => (
-            <Card key={buyer.id}>
-              <CardHeader>
-                <CardTitle>{buyer.name}</CardTitle>
-                <CardDescription>{buyer.contact}</CardDescription>
+            <Card key={buyer.id} className="shadow-sm">
+              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+                <CardTitle className="text-sm font-bold">{buyer.name}</CardTitle>
+                <CardDescription className="text-[10px]">{buyer.contact}</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">{buyer.address}</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(buyer)}>
+              <CardContent className="p-3">
+                <p className="text-xs text-muted-foreground mb-3">{buyer.address}</p>
+                <div className="flex gap-1.5">
+                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleEdit(buyer)}>
                     <Edit className="h-3 w-3 mr-1" />
                     Edit
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(buyer.id)}>
+                  <Button variant="destructive" size="sm" className="h-7 text-[10px]" onClick={() => handleDelete(buyer.id)}>
                     <Trash2 className="h-3 w-3 mr-1" />
                     Delete
                   </Button>

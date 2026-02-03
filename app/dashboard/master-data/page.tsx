@@ -10,23 +10,23 @@ import { WorkersTab } from "@/components/master-data/workers-tab"
 
 export default function MasterDataPage() {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Master Data</h1>
-          <p className="text-muted-foreground mt-1">Manage your farm's core configuration and settings</p>
+          <h1 className="text-xl font-bold">Master Data</h1>
+          <p className="text-[10px] text-muted-foreground">Manage your farm's core configuration and settings</p>
         </div>
       </div>
 
-      <Tabs defaultValue="farms" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7 lg:w-auto">
-          <TabsTrigger value="farms">Farms</TabsTrigger>
-          <TabsTrigger value="houses">Houses</TabsTrigger>
-          <TabsTrigger value="batches">Batches</TabsTrigger>
-          <TabsTrigger value="workers">Workers</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          <TabsTrigger value="buyers">Buyers</TabsTrigger>
-          <TabsTrigger value="feed">Feed Types</TabsTrigger>
+      <Tabs defaultValue="farms" className="space-y-3">
+        <TabsList className="grid w-full grid-cols-7 lg:w-auto h-8 p-0.5 bg-slate-100">
+          <TabsTrigger value="farms" className="text-xs h-7">Farms</TabsTrigger>
+          <TabsTrigger value="houses" className="text-xs h-7">Houses</TabsTrigger>
+          <TabsTrigger value="batches" className="text-xs h-7">Batches</TabsTrigger>
+          <TabsTrigger value="workers" className="text-xs h-7">Workers</TabsTrigger>
+          <TabsTrigger value="suppliers" className="text-xs h-7">Suppliers</TabsTrigger>
+          <TabsTrigger value="buyers" className="text-xs h-7">Buyers</TabsTrigger>
+          <TabsTrigger value="feed" className="text-xs h-7">Feed</TabsTrigger>
         </TabsList>
 
         <TabsContent value="farms">

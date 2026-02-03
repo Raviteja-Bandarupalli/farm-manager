@@ -71,17 +71,17 @@ export function WorkersTab() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Workers</h2>
-          <p className="text-sm text-muted-foreground">Manage farm workers and assign them to batches</p>
+          <h2 className="text-lg font-bold">Workers</h2>
+          <p className="text-[10px] text-muted-foreground">Manage farm workers and assign them to batches</p>
         </div>
         {isOwner && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
+              <Button size="sm" className="h-8 text-[11px]" onClick={resetForm}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
                 Add Worker
               </Button>
             </DialogTrigger>
@@ -130,9 +130,9 @@ export function WorkersTab() {
       </div>
 
       {workers.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        <Card className="shadow-sm">
+          <CardContent className="py-8 text-center">
+            <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-muted-foreground mb-4">No workers added yet</p>
             {isOwner && (
               <Button onClick={() => setIsDialogOpen(true)}>
@@ -143,34 +143,34 @@ export function WorkersTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
           {workers.map((worker) => (
-            <Card key={worker.id}>
-              <CardHeader>
+            <Card key={worker.id} className="shadow-sm">
+              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
                 <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{worker.name}</CardTitle>
-                    {worker.location && <CardDescription>{worker.location}</CardDescription>}
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-sm font-bold">{worker.name}</CardTitle>
+                    {worker.location && <CardDescription className="text-[10px]">{worker.location}</CardDescription>}
                   </div>
-                  <Badge variant={worker.active ? "default" : "secondary"}>
+                  <Badge variant={worker.active ? "default" : "secondary"} className="text-[9px] h-4 px-1.5">
                     {worker.active ? "Active" : "Inactive"}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="p-3">
+                <div className="space-y-2.5">
                   {worker.phone && (
-                    <div className="text-sm">
-                      <p className="text-muted-foreground">Phone</p>
-                      <p className="font-medium">{worker.phone}</p>
+                    <div className="text-xs">
+                      <p className="text-[10px] text-muted-foreground">Phone</p>
+                      <p className="font-bold">{worker.phone}</p>
                     </div>
                   )}
                   {isOwner && (
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex gap-1.5">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 bg-transparent"
+                        className="flex-1 h-7 text-[10px] bg-transparent"
                         onClick={() => handleEdit(worker)}
                       >
                         <Edit className="h-3 w-3 mr-1" />
@@ -180,7 +180,7 @@ export function WorkersTab() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1 bg-transparent"
+                          className="flex-1 h-7 text-[10px] bg-transparent"
                           onClick={() => handleDeactivate(worker.id)}
                         >
                           <UserX className="h-3 w-3 mr-1" />

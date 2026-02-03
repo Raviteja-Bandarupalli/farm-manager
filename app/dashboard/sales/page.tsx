@@ -210,51 +210,51 @@ export default function SalesPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Sales</h1>
-          <p className="text-muted-foreground mt-1">Record and manage broiler sales</p>
+          <h1 className="text-xl font-bold">Sales</h1>
+          <p className="text-[10px] text-muted-foreground">Record and manage broiler sales</p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Buyers</CardTitle>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Buyers</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{uniqueBuyers}</div>
-            <p className="text-xs text-muted-foreground">Buyers in system</p>
+          <CardContent className="p-3">
+            <div className="text-lg font-bold">{uniqueBuyers}</div>
+            <p className="text-[10px] text-muted-foreground">Buyers in system</p>
           </CardContent>
         </Card>
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Sales</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">₹{totalSales.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total sales value</p>
+          <CardContent className="p-3">
+            <div className="text-lg font-bold">₹{totalSales.toFixed(2)}</div>
+            <p className="text-[10px] text-muted-foreground">Total sales value</p>
           </CardContent>
         </Card>
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Sales Entries</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Entries</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{sales.length}</div>
-            <p className="text-xs text-muted-foreground">Sales entries</p>
+          <CardContent className="p-3">
+            <div className="text-lg font-bold">{sales.length}</div>
+            <p className="text-[10px] text-muted-foreground">Sales entries recorded</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
+      <div className="space-y-3">
+        <Card className="shadow-sm">
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
             <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-2">
-                <CardTitle>Sales</CardTitle>
-                <CardDescription>All sales with buyer, quantity, and value details</CardDescription>
+              <div>
+                <CardTitle className="text-sm font-bold">Sales History</CardTitle>
+                <CardDescription className="text-[10px]">Buyer, quantity, and value details</CardDescription>
               </div>
               <Dialog
                 open={isSaleDialogOpen}
@@ -264,8 +264,8 @@ export default function SalesPage() {
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button onClick={startAddNewSale}>
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button size="sm" className="h-8 text-[11px]" onClick={startAddNewSale}>
+                    <Plus className="h-3.5 w-3.5 mr-1" />
                     Add Sale
                   </Button>
                 </DialogTrigger>
@@ -342,12 +342,12 @@ export default function SalesPage() {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-6">
+          <CardContent className="p-0">
+            <div className="flex items-center gap-4 py-2 px-3 bg-slate-50/30 border-b">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">Buyer:</label>
+                <label className="text-[10px] font-bold uppercase text-slate-500">Filter Buyer:</label>
                 <Select value={selectedBuyerId} onValueChange={setSelectedBuyerId}>
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-[180px] h-7 text-[10px] bg-white">
                     <SelectValue placeholder="All buyers" />
                   </SelectTrigger>
                   <SelectContent>
@@ -381,14 +381,14 @@ export default function SalesPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Buyer</TableHead>
-                      <TableHead className="text-right">Birds</TableHead>
-                      <TableHead className="text-right">Live Wt (kg)</TableHead>
-                      <TableHead className="text-right">Rate (₹/kg)</TableHead>
-                      <TableHead className="text-right">Total (₹)</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
+                    <TableRow className="h-10 bg-slate-50/50">
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight">Date</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight">Buyer</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Birds</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Live Wt</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Rate</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Total</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -398,29 +398,29 @@ export default function SalesPage() {
                         const buyer = buyers.find((b) => b.id === sale.buyerId)
                         const liveWeight = sale.birds * sale.avgWeightKg
                         return (
-                          <TableRow key={sale.id}>
-                            <TableCell className="text-sm">
+                          <TableRow key={sale.id} className="h-11">
+                            <TableCell className="text-xs py-1">
                               {formatIndianDate(sale.date)}
                             </TableCell>
-                            <TableCell>{buyer ? buyer.name : "Buyer Deleted"}</TableCell>
-                            <TableCell className="text-right">{sale.birds.toLocaleString("en-IN")}</TableCell>
-                            <TableCell className="text-right">{liveWeight.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">₹{sale.ratePerKg.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium">
+                            <TableCell className="text-[11px] font-medium py-1">{buyer ? buyer.name : "Buyer Deleted"}</TableCell>
+                            <TableCell className="text-xs text-right py-1">{sale.birds.toLocaleString("en-IN")}</TableCell>
+                            <TableCell className="text-xs text-right py-1">{liveWeight.toFixed(2)}kg</TableCell>
+                            <TableCell className="text-xs text-right py-1">₹{sale.ratePerKg.toFixed(2)}</TableCell>
+                            <TableCell className="text-xs text-right font-bold py-1 text-slate-900">
                               ₹{sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                             </TableCell>
-                            <TableCell className="text-center">
-                              <div className="flex gap-2 justify-center">
-                                <Button variant="outline" size="sm" onClick={() => handleEditSale(sale)}>
-                                  <Edit className="h-4 w-4" />
+                            <TableCell className="py-1">
+                              <div className="flex gap-1.5 justify-center">
+                                <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => handleEditSale(sale)}>
+                                  <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale)}>
-                                  <Trash2 className="h-4 w-4" />
+                                <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteSale(sale)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                                 {sale.financeTransactionId && (
                                   <Link href={`/dashboard/finance?transactionId=${sale.financeTransactionId}`}>
-                                    <Button variant="ghost" size="sm" title="View in Finance" asChild>
-                                      <ExternalLink className="h-4 w-4 text-green-600" />
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View in Finance">
+                                      <ExternalLink className="h-3.5 w-3.5 text-green-600" />
                                     </Button>
                                   </Link>
                                 )}
