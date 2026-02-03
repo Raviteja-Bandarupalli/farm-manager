@@ -98,15 +98,15 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <Button asChild variant="outline" size="sm" className="h-8 text-[11px]">
+        <Button asChild variant="outline" size="sm" className="h-9 px-3 text-xs font-bold bg-white shadow-sm border-slate-200">
           <Link href="/dashboard/daily-logs">
-            <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Link>
         </Button>
         <div>
-          <h1 className="text-xl font-bold">Batch: {batch.name}</h1>
-          <p className="text-[10px] text-muted-foreground leading-tight">
+          <h1 className="text-2xl font-bold tracking-tight">Batch: {batch.name}</h1>
+          <p className="text-xs text-muted-foreground leading-tight">
             {house?.name} • {farm?.name}
             {batchWorkers.length > 0 && (
               <span className="ml-2">| Workers: {batchWorkers.map((w) => w.name).join(", ")}</span>
@@ -117,30 +117,29 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
 
       <div className="grid gap-2 md:grid-cols-2">
         <Card className="shadow-sm border-primary/20">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-sm font-bold">Birds & Mortality Summary</CardTitle>
-            <CardDescription className="text-[10px]">Flock status tracking</CardDescription>
+          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+            <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Birds & Mortality Summary</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Initial Birds</p>
-                <p className="text-lg font-bold">{batch.initialBirds.toLocaleString("en-IN")}</p>
+          <CardContent className="p-4 pt-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-tight">Initial Birds</p>
+                <p className="text-2xl font-extrabold tracking-tight">{batch.initialBirds.toLocaleString("en-IN")}</p>
               </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold text-red-500">Mortality</p>
-                <p className="text-lg font-bold text-red-600">
+              <div className="space-y-1">
+                <p className="text-[10px] text-red-400 uppercase font-extrabold tracking-tight">Mortality</p>
+                <p className="text-2xl font-extrabold tracking-tight text-red-600">
                   {latestLog ? latestLog.cumulativeMortality.toLocaleString("en-IN") : 0}
                 </p>
               </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold text-green-500">Live Birds</p>
-                <p className="text-lg font-bold text-green-600">{currentBirds.toLocaleString("en-IN")}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-green-400 uppercase font-extrabold tracking-tight">Live Birds</p>
+                <p className="text-2xl font-extrabold tracking-tight text-green-600">{currentBirds.toLocaleString("en-IN")}</p>
               </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Mortality %</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-tight">Mortality %</p>
                 <p
-                  className={`text-lg font-bold ${mortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
+                  className={`text-2xl font-extrabold tracking-tight ${mortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
                 >
                   {mortalityPercent.toFixed(2)}%
                 </p>
@@ -149,29 +148,28 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-blue-500/20">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-sm font-bold">Age & Feed Conversion</CardTitle>
-            <CardDescription className="text-[10px]">Efficiency metrics</CardDescription>
+        <Card className="shadow-sm border-blue-200">
+          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+            <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Age & Feed Conversion</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Age (Days)</p>
-                <p className="text-lg font-bold">{ageInDays}</p>
+          <CardContent className="p-4 pt-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-tight">Age (Days)</p>
+                <p className="text-2xl font-extrabold tracking-tight">{ageInDays}</p>
               </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Feed (kg)</p>
-                <p className="text-lg font-bold text-blue-600">{totalFeedUsed.toFixed(1)}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-blue-400 uppercase font-extrabold tracking-tight">Feed (kg)</p>
+                <p className="text-2xl font-extrabold tracking-tight text-blue-600">{totalFeedUsed.toFixed(1)}</p>
               </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Avg Wt (kg)</p>
-                <p className="text-lg font-bold text-slate-700">{latestWeight > 0 ? latestWeight.toFixed(2) : "0.00"}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-tight">Avg Wt (kg)</p>
+                <p className="text-2xl font-extrabold tracking-tight text-slate-700">{latestWeight > 0 ? latestWeight.toFixed(2) : "0.00"}</p>
               </div>
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Cum. FCR</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-tight">Cum. FCR</p>
                 <p
-                  className={`text-lg font-bold ${currentFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}
+                  className={`text-2xl font-extrabold tracking-tight ${currentFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}
                 >
                   {currentFCR.toFixed(2)}
                 </p>
