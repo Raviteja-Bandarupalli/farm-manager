@@ -52,30 +52,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
-        <div className="container flex h-12 items-center justify-between">
+        <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden h-8 w-8"
+              className="md:hidden h-9 w-9"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-5 w-5" />
             </Button>
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-lg text-primary-foreground">🐔</span>
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+                <span className="text-xl text-primary-foreground">🐔</span>
               </div>
-              <span className="font-bold text-base">FarmManager</span>
+              <span className="font-bold text-lg tracking-tight">FarmManager</span>
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className="hidden md:flex flex-col items-end leading-tight">
-              <p className="text-[11px] font-bold">{user.name}</p>
-              <p className="text-[9px] text-muted-foreground">{user.email}</p>
+              <p className="text-sm font-bold">{user.name}</p>
+              <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
-            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={logout}>
-              <LogOut className="h-3 w-3 mr-1.5" />
+            <Button variant="outline" size="sm" className="h-8 text-xs font-bold px-3" onClick={logout}>
+              <LogOut className="h-4 w-4 mr-1.5" />
               Logout
             </Button>
           </div>
@@ -84,8 +84,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar Navigation - Desktop */}
-        <aside className="hidden md:flex w-52 flex-col gap-2 border-r p-2.5 overflow-y-auto flex-shrink-0">
-          <nav className="flex flex-col gap-0.5">
+        <aside className="hidden md:flex w-60 flex-col gap-2 border-r p-3 overflow-y-auto flex-shrink-0">
+          <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href))
               return (
@@ -93,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={item.href}
                   variant="ghost"
                   className={cn(
-                    "w-full h-9 justify-start relative text-xs px-2.5",
+                    "w-full h-10 justify-start relative text-sm px-3",
                     isActive && "bg-slate-100 text-primary font-bold hover:bg-slate-200 border-r-4 border-primary"
                   )}
                   asChild

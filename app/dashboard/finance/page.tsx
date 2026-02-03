@@ -177,17 +177,17 @@ export default function FinancePage() {
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Finance Tracking</h1>
-          <p className="text-[10px] text-muted-foreground">Monitor income, expenses, and financial performance</p>
+          <h1 className="text-2xl font-bold">Finance Tracking</h1>
+          <p className="text-xs text-muted-foreground">Monitor income, expenses, and financial performance</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
               size="sm"
-              className="h-8 text-[11px]"
+              className="h-8 text-xs font-bold"
               onClick={() => {
                 setEditingId(null)
                 setFormData({
@@ -200,7 +200,7 @@ export default function FinancePage() {
                 })
               }}
             >
-              <Plus className="h-3.5 w-3.5 mr-1" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Transaction
             </Button>
           </DialogTrigger>
@@ -294,28 +294,28 @@ export default function FinancePage() {
       </div>
 
       <Card className="shadow-sm">
-        <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+        <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
           <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Calendar className="h-3.5 w-3.5" />
+            <Calendar className="h-4 w-4 text-slate-400" />
             Filter Period
           </CardTitle>
         </CardHeader>
         <CardContent className="p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-slate-500">Start Date</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-slate-500">Start Date</label>
               <Input
                 type="date"
-                className="h-8 text-xs"
+                className="h-9 text-sm"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-slate-500">End Date</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
               <Input
                 type="date"
-                className="h-8 text-xs"
+                className="h-9 text-sm"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
               />
@@ -345,39 +345,39 @@ export default function FinancePage() {
         </Card>
       )}
 
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Income</CardTitle>
-            <TrendingUp className="h-3.5 w-3.5 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Income</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold text-green-600">{formatINR(totalIncome)}</div>
-            <p className="text-[10px] text-muted-foreground">Total received</p>
+            <div className="text-2xl font-extrabold text-green-600">{formatINR(totalIncome)}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">Total received</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Expenses</CardTitle>
-            <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Expenses</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold text-red-600">{formatINR(totalExpenses)}</div>
-            <p className="text-[10px] text-muted-foreground">Total paid out</p>
+            <div className="text-2xl font-extrabold text-red-600">{formatINR(totalExpenses)}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">Total paid out</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Net Balance</CardTitle>
-            <DollarSign className="h-3.5 w-3.5 text-slate-400" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Net Balance</CardTitle>
+            <DollarSign className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent className="p-3">
-            <div className={`text-lg font-bold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+            <div className={`text-2xl font-extrabold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
               {formatINR(balance)}
             </div>
-            <p className="text-[10px] text-muted-foreground">{balance >= 0 ? "Surplus" : "Deficit"}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{balance >= 0 ? "Surplus" : "Deficit"}</p>
           </CardContent>
         </Card>
       </div>
@@ -447,9 +447,9 @@ export default function FinancePage() {
       </div>
 
       <Card className="shadow-sm">
-        <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+        <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
           <CardTitle className="text-sm font-bold">Transaction History</CardTitle>
-          <CardDescription className="text-[10px]">{sortedTransactions.length} transactions in period</CardDescription>
+          <CardDescription className="text-xs">{sortedTransactions.length} transactions in period</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {sortedTransactions.length === 0 ? (
@@ -465,13 +465,13 @@ export default function FinancePage() {
               <Table>
                 <TableHeader>
                   <TableRow className="h-10 bg-slate-50/50">
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight">Date</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight">Type</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight">Category</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight">Description</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight">Reference</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Amount</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-tight text-center">Actions</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Type</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Category</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Description</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Reference</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Amount</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

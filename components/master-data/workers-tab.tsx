@@ -71,17 +71,17 @@ export function WorkersTab() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold">Workers</h2>
-          <p className="text-[10px] text-muted-foreground">Manage farm workers and assign them to batches</p>
+          <h2 className="text-xl font-bold">Workers</h2>
+          <p className="text-xs text-muted-foreground">Manage farm workers and assign them to batches</p>
         </div>
         {isOwner && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="h-8 text-[11px]" onClick={resetForm}>
-                <Plus className="h-3.5 w-3.5 mr-1" />
+              <Button size="sm" className="h-8 text-xs font-bold" onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-1.5" />
                 Add Worker
               </Button>
             </DialogTrigger>
@@ -143,47 +143,47 @@ export function WorkersTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {workers.map((worker) => (
             <Card key={worker.id} className="shadow-sm">
-              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
                 <div className="flex items-start justify-between">
                   <div className="space-y-0.5">
                     <CardTitle className="text-sm font-bold">{worker.name}</CardTitle>
-                    {worker.location && <CardDescription className="text-[10px]">{worker.location}</CardDescription>}
+                    {worker.location && <CardDescription className="text-xs">{worker.location}</CardDescription>}
                   </div>
-                  <Badge variant={worker.active ? "default" : "secondary"} className="text-[9px] h-4 px-1.5">
+                  <Badge variant={worker.active ? "default" : "secondary"} className="text-[10px] font-bold h-5 px-2">
                     {worker.active ? "Active" : "Inactive"}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-3">
-                <div className="space-y-2.5">
+              <CardContent className="p-4">
+                <div className="space-y-3">
                   {worker.phone && (
                     <div className="text-xs">
-                      <p className="text-[10px] text-muted-foreground">Phone</p>
-                      <p className="font-bold">{worker.phone}</p>
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Phone Number</p>
+                      <p className="text-sm font-extrabold text-slate-800">{worker.phone}</p>
                     </div>
                   )}
                   {isOwner && (
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-2 pt-1">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-7 text-[10px] bg-transparent"
+                        className="flex-1 h-8 text-xs font-bold bg-transparent"
                         onClick={() => handleEdit(worker)}
                       >
-                        <Edit className="h-3 w-3 mr-1" />
+                        <Edit className="h-3.5 w-3.5 mr-1.5" />
                         Edit
                       </Button>
                       {worker.active && (
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1 h-7 text-[10px] bg-transparent"
+                          className="flex-1 h-8 text-xs font-bold bg-transparent"
                           onClick={() => handleDeactivate(worker.id)}
                         >
-                          <UserX className="h-3 w-3 mr-1" />
+                          <UserX className="h-3.5 w-3.5 mr-1.5" />
                           Deactivate
                         </Button>
                       )}

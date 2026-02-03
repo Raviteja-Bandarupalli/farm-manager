@@ -53,19 +53,19 @@ export function HousesTab() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex justify-end">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
               size="sm"
-              className="h-8 text-[11px]"
+              className="h-8 text-xs font-bold"
               onClick={() => {
                 setEditingId(null)
                 setFormData({ farmId: "", name: "", capacity: "", status: "active" })
               }}
             >
-              <Plus className="h-3.5 w-3.5 mr-1" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add House
             </Button>
           </DialogTrigger>
@@ -135,10 +135,10 @@ export function HousesTab() {
         </Dialog>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {houses.length === 0 ? (
           <Card className="col-span-full shadow-sm">
-            <CardContent className="flex flex-col items-center justify-center py-8">
+            <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground mb-4">No houses added yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -149,27 +149,27 @@ export function HousesTab() {
         ) : (
           houses.map((house) => (
             <Card key={house.id} className="shadow-sm">
-              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
                 <CardTitle className="text-sm font-bold">{house.name}</CardTitle>
-                <CardDescription className="text-[10px]">{getFarmName(house.farmId)}</CardDescription>
+                <CardDescription className="text-xs">{getFarmName(house.farmId)}</CardDescription>
               </CardHeader>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground mb-1.5">Capacity: {house.capacity.toLocaleString()} birds</p>
-                <p className="text-xs mb-3">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium text-slate-500 mb-1">Capacity: {house.capacity.toLocaleString()} birds</p>
+                <p className="text-xs mb-4">
                   Status:{" "}
                   <span
-                    className={`font-bold capitalize ${house.status === "active" ? "text-green-600" : house.status === "maintenance" ? "text-yellow-600" : "text-gray-600"}`}
+                    className={`font-extrabold capitalize ${house.status === "active" ? "text-green-600" : house.status === "maintenance" ? "text-yellow-600" : "text-gray-600"}`}
                   >
                     {house.status}
                   </span>
                 </p>
-                <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleEdit(house)}>
-                    <Edit className="h-3 w-3 mr-1" />
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleEdit(house)}>
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
-                  <Button variant="destructive" size="sm" className="h-7 text-[10px]" onClick={() => handleDelete(house.id)}>
-                    <Trash2 className="h-3 w-3 mr-1" />
+                  <Button variant="destructive" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleDelete(house.id)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                     Delete
                   </Button>
                 </div>

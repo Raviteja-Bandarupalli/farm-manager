@@ -227,16 +227,16 @@ export function BatchesTab() {
   const remainingBirds = Number.parseInt(formData.initialBirds || "0") - totalSectionBirds
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold">Batches</h2>
-          <p className="text-[10px] text-muted-foreground">Manage broiler batches and track flock placements</p>
+          <h2 className="text-xl font-bold">Batches</h2>
+          <p className="text-xs text-muted-foreground">Manage broiler batches and track flock placements</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="h-8 text-[11px]" onClick={resetForm}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
+            <Button size="sm" className="h-8 text-xs font-bold" onClick={resetForm}>
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Batch
             </Button>
           </DialogTrigger>
@@ -489,66 +489,66 @@ export function BatchesTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {batches.map((batch) => (
             <Card key={batch.id} className="shadow-sm">
-              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
                 <div className="flex items-start justify-between">
                   <div className="space-y-0.5">
                     <CardTitle className="text-sm font-bold">{batch.name}</CardTitle>
-                    <CardDescription className="text-[10px]">
+                    <CardDescription className="text-xs">
                       {getHouseName(batch.houseId)} • {getFarmName(batch.houseId)}
                     </CardDescription>
                   </div>
-                  <div className="scale-75 origin-top-right">
+                  <div className="scale-90 origin-top-right">
                     {getStatusBadge(batch.status)}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-3">
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Calendar className="h-3 w-3 text-slate-400" />
-                    <span className="text-muted-foreground uppercase text-[9px] font-bold">Placed:</span>
-                    <span className="font-bold">{new Date(batch.placementDate).toLocaleDateString()}</span>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="text-muted-foreground uppercase text-[10px] font-bold">Placed:</span>
+                    <span className="font-extrabold text-slate-800">{new Date(batch.placementDate).toLocaleDateString()}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <p className="text-muted-foreground uppercase font-bold text-[8px]">Birds</p>
-                      <p className="font-bold text-xs">{batch.initialBirds.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Birds</p>
+                      <p className="font-extrabold text-sm text-slate-800">{batch.initialBirds.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground uppercase font-bold text-[8px]">Breed</p>
-                      <p className="font-medium text-xs">{batch.breed}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px]">
-                    <div>
-                      <p className="text-muted-foreground uppercase font-bold text-[8px]">T. FCR</p>
-                      <p className="font-bold text-xs">{batch.targetFCR}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground uppercase font-bold text-[8px]">Mort. %</p>
-                      <p className="font-bold text-xs">{batch.mortalityThreshold}%</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Breed</p>
+                      <p className="font-bold text-sm text-slate-600 truncate">{batch.breed}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Target FCR</p>
+                      <p className="font-extrabold text-sm text-blue-600">{batch.targetFCR}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Mortality %</p>
+                      <p className="font-extrabold text-sm text-red-600">{batch.mortalityThreshold}%</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 h-7 text-[10px] bg-transparent"
+                      className="flex-1 h-8 text-xs font-bold bg-transparent"
                       onClick={() => handleEdit(batch)}
                     >
-                      <Edit className="h-3 w-3 mr-1" />
+                      <Edit className="h-3.5 w-3.5 mr-1.5" />
                       Edit
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 h-7 text-[10px] bg-transparent"
+                      className="flex-1 h-8 text-xs font-bold bg-transparent"
                       onClick={() => handleDelete(batch.id)}
                     >
-                      <Trash2 className="h-3 w-3 mr-1" />
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                       Delete
                     </Button>
                   </div>

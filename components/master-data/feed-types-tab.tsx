@@ -62,19 +62,19 @@ export function FeedTypesTab() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex justify-end">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
               size="sm"
-              className="h-8 text-[11px]"
+              className="h-8 text-xs font-bold"
               onClick={() => {
                 setEditingId(null)
                 setFormData({ name: "", category: "starter", protein: "", price: "" })
               }}
             >
-              <Plus className="h-3.5 w-3.5 mr-1" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Feed Type
             </Button>
           </DialogTrigger>
@@ -136,10 +136,10 @@ export function FeedTypesTab() {
         </Dialog>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {feedTypes.length === 0 ? (
           <Card className="col-span-full shadow-sm">
-            <CardContent className="flex flex-col items-center justify-center py-8">
+            <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground mb-4">No feed types added yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -150,20 +150,22 @@ export function FeedTypesTab() {
         ) : (
           feedTypes.map((feedType) => (
             <Card key={feedType.id} className="shadow-sm">
-              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
                 <CardTitle className="text-sm font-bold">{feedType.name}</CardTitle>
-                <CardDescription className="text-[10px] capitalize">{feedType.category}</CardDescription>
+                <CardDescription className="text-xs capitalize">{feedType.category} Feed</CardDescription>
               </CardHeader>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground mb-0.5">Protein: {feedType.protein}%</p>
-                <p className="text-xs text-muted-foreground mb-3">Price: ₹{feedType.price}/kg</p>
-                <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => handleEdit(feedType)}>
-                    <Edit className="h-3 w-3 mr-1" />
+              <CardContent className="p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-xs font-medium text-slate-500">Protein: <span className="font-bold text-slate-700">{feedType.protein}%</span></p>
+                  <p className="text-sm font-extrabold text-blue-600">₹{feedType.price}<span className="text-[10px] font-medium text-muted-foreground ml-0.5">/kg</span></p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleEdit(feedType)}>
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
-                  <Button variant="destructive" size="sm" className="h-7 text-[10px]" onClick={() => handleDelete(feedType.id)}>
-                    <Trash2 className="h-3 w-3 mr-1" />
+                  <Button variant="destructive" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleDelete(feedType.id)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                     Delete
                   </Button>
                 </div>

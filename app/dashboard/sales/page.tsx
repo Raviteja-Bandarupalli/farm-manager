@@ -210,51 +210,51 @@ export default function SalesPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Sales</h1>
-          <p className="text-[10px] text-muted-foreground">Record and manage broiler sales</p>
+          <h1 className="text-2xl font-bold">Sales</h1>
+          <p className="text-xs text-muted-foreground">Record and manage broiler sales</p>
         </div>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <Card className="shadow-sm">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Buyers</CardTitle>
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Buyers</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold">{uniqueBuyers}</div>
-            <p className="text-[10px] text-muted-foreground">Buyers in system</p>
+            <div className="text-2xl font-extrabold">{uniqueBuyers}</div>
+            <p className="text-xs text-muted-foreground">Buyers in system</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Sales</CardTitle>
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Sales</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold">₹{totalSales.toFixed(2)}</div>
-            <p className="text-[10px] text-muted-foreground">Total sales value</p>
+            <div className="text-2xl font-extrabold text-blue-600">₹{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-xs text-muted-foreground">Total sales value</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Entries</CardTitle>
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Entries</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold">{sales.length}</div>
-            <p className="text-[10px] text-muted-foreground">Sales entries recorded</p>
+            <div className="text-2xl font-extrabold">{sales.length}</div>
+            <p className="text-xs text-muted-foreground">Sales entries recorded</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+          <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold">Sales History</CardTitle>
-                <CardDescription className="text-[10px]">Buyer, quantity, and value details</CardDescription>
+                <CardDescription className="text-xs">Buyer, quantity, and value details</CardDescription>
               </div>
               <Dialog
                 open={isSaleDialogOpen}
@@ -264,8 +264,8 @@ export default function SalesPage() {
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 text-[11px]" onClick={startAddNewSale}>
-                    <Plus className="h-3.5 w-3.5 mr-1" />
+                  <Button size="sm" className="h-8 text-xs font-bold" onClick={startAddNewSale}>
+                    <Plus className="h-4 w-4 mr-1.5" />
                     Add Sale
                   </Button>
                 </DialogTrigger>
@@ -343,11 +343,11 @@ export default function SalesPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="flex items-center gap-4 py-2 px-3 bg-slate-50/30 border-b">
+            <div className="flex items-center gap-4 py-2.5 px-4 bg-slate-50/30 border-b">
               <div className="flex items-center gap-2">
-                <label className="text-[10px] font-bold uppercase text-slate-500">Filter Buyer:</label>
+                <label className="text-xs font-bold uppercase text-slate-500">Filter Buyer:</label>
                 <Select value={selectedBuyerId} onValueChange={setSelectedBuyerId}>
-                  <SelectTrigger className="w-[180px] h-7 text-[10px] bg-white">
+                  <SelectTrigger className="w-[200px] h-8 text-xs bg-white font-medium">
                     <SelectValue placeholder="All buyers" />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,13 +382,13 @@ export default function SalesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="h-10 bg-slate-50/50">
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight">Date</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight">Buyer</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Birds</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Live Wt</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Rate</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Total</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-tight text-center">Actions</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight">Buyer</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Birds</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Live Wt</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Rate</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Total</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

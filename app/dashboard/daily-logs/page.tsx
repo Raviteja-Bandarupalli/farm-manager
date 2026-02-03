@@ -359,18 +359,18 @@ export default function DailyLogsPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Daily Logs</h1>
-          <p className="text-[10px] text-muted-foreground">Track daily activities and metrics for your broiler flocks</p>
+          <h1 className="text-2xl font-bold">Daily Logs</h1>
+          <p className="text-xs text-muted-foreground">Track daily activities and metrics for your broiler flocks</p>
         </div>
         <div className="flex gap-2">
           {user && user.role === "owner" && (
             <Dialog open={isWeeklyFeedDialogOpen} onOpenChange={setIsWeeklyFeedDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-[11px]">
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                <Button variant="outline" size="sm" className="h-8 text-xs font-bold">
+                  <Calendar className="h-4 w-4 mr-1.5" />
                   Weekly Feed
                 </Button>
               </DialogTrigger>
@@ -474,8 +474,8 @@ export default function DailyLogsPage() {
           {user && (user.role === "owner" || user.role === "manager") && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={startAddNewLog} size="sm" className="h-8 text-[11px]">
-                  <Plus className="h-3.5 w-3.5 mr-1" />
+                <Button onClick={startAddNewLog} size="sm" className="h-8 text-xs font-bold">
+                  <Plus className="h-4 w-4 mr-1.5" />
                   Add Daily Log
                 </Button>
               </DialogTrigger>
@@ -782,19 +782,19 @@ export default function DailyLogsPage() {
       )}
 
       <Card className="shadow-sm">
-        <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/50">
+        <CardHeader className="py-2.5 px-4 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/50">
           <div className="flex flex-col">
             <CardTitle className="text-sm font-bold">Daily Logs History</CardTitle>
-            <CardDescription className="text-[10px] hidden sm:block">View recorded daily metrics</CardDescription>
+            <CardDescription className="text-xs hidden sm:block">View recorded daily metrics</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Filter className="h-3 w-3 text-muted-foreground" />
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
             <Select value={filterHouse} onValueChange={setFilterHouse}>
-              <SelectTrigger className="h-7 w-[140px] text-[10px] bg-slate-50">
+              <SelectTrigger className="h-8 w-[160px] text-xs font-medium bg-white">
                 <SelectValue placeholder="All Houses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" className="text-[10px]">All Houses</SelectItem>
+                <SelectItem value="all" className="text-xs">All Houses</SelectItem>
                 {houses.map((house) => (
                   <SelectItem key={house.id} value={house.id} className="text-[10px]">
                     {house.name}
@@ -889,42 +889,42 @@ export default function DailyLogsPage() {
           </div>
 
           {sortedLogs.length > 0 && (
-            <div className="mt-1 pt-1 border-t border-slate-100 px-2 pb-2">
-              <h3 className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1 px-1">
+            <div className="mt-1 pt-2 border-t border-slate-100 px-4 pb-3 bg-slate-50/30">
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 px-1">
                 Batch Summary (Filtered)
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
-                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">Total Mortality</p>
-                  <p className="text-sm font-bold text-red-600">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-white p-2.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Total Mortality</p>
+                  <p className="text-lg font-extrabold text-red-600 leading-tight">
                     {summaryMetrics.totalMortality.toLocaleString("en-IN")}
                   </p>
                 </div>
 
-                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">Closing Birds</p>
-                  <p className="text-sm font-bold text-slate-900">
+                <div className="bg-white p-2.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Closing Birds</p>
+                  <p className="text-lg font-extrabold text-slate-900 leading-tight">
                     {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
                   </p>
                 </div>
 
-                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">Cum. Mortality %</p>
-                  <p className="text-sm font-bold text-orange-600">
+                <div className="bg-white p-2.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Cum. Mort. %</p>
+                  <p className="text-lg font-extrabold text-orange-600 leading-tight">
                     {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
                   </p>
                 </div>
 
-                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">Days Logged</p>
-                  <p className="text-sm font-bold text-slate-900">
+                <div className="bg-white p-2.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Days Logged</p>
+                  <p className="text-lg font-extrabold text-slate-900 leading-tight">
                     {summaryMetrics.daysLogged}
                   </p>
                 </div>
 
-                <div className="bg-slate-50/50 p-1.5 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">Avg. Mortality/Day</p>
-                  <p className="text-sm font-bold text-slate-900">
+                <div className="bg-white p-2.5 rounded border border-slate-100 shadow-sm">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Avg. Mort/Day</p>
+                  <p className="text-lg font-extrabold text-slate-900 leading-tight">
                     {summaryMetrics.avgMortalityPerDay.toFixed(1)}
                   </p>
                 </div>

@@ -380,11 +380,11 @@ export default function InventoryPage() {
   const totalValue = items.reduce((sum, item) => sum + item.currentStock * item.averageCost, 0)
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Inventory Management</h1>
-          <p className="text-[10px] text-muted-foreground">Track items, purchases, and issues for your broiler farm</p>
+          <h1 className="text-2xl font-bold">Inventory Management</h1>
+          <p className="text-xs text-muted-foreground">Track items, purchases, and issues for your broiler farm</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isItemDialogOpen} onOpenChange={(open) => {
@@ -394,8 +394,8 @@ export default function InventoryPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-[11px]" onClick={startAddNewItem}>
-                <Package className="h-3.5 w-3.5 mr-1" />
+              <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={startAddNewItem}>
+                <Package className="h-4 w-4 mr-1.5" />
                 Add Item
               </Button>
             </DialogTrigger>
@@ -512,8 +512,8 @@ export default function InventoryPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-[11px]" onClick={startAddNewPurchase}>
-                <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+              <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={startAddNewPurchase}>
+                <ShoppingCart className="h-4 w-4 mr-1.5" />
                 Purchase Entry
               </Button>
             </DialogTrigger>
@@ -619,8 +619,8 @@ export default function InventoryPage() {
 
           <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="h-8 text-[11px]">
-                <TrendingDown className="h-3.5 w-3.5 mr-1" />
+              <Button size="sm" className="h-8 text-xs font-bold">
+                <TrendingDown className="h-4 w-4 mr-1.5" />
                 Issue Entry
               </Button>
             </DialogTrigger>
@@ -732,17 +732,17 @@ export default function InventoryPage() {
               <AlertTriangle className="h-4 w-4" />
               Low Stock Alert
             </CardTitle>
-            <CardDescription className="text-[10px]">{lowStockItems.length} items below reorder level</CardDescription>
+            <CardDescription className="text-xs font-medium">{lowStockItems.length} items below reorder level</CardDescription>
           </CardHeader>
           <CardContent className="p-2">
             <div className="space-y-1.5">
               {lowStockItems.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-2 bg-orange-50/50 rounded border border-orange-100">
+                <div key={item.id} className="flex justify-between items-center p-2 bg-orange-50/50 rounded border border-orange-100 shadow-sm">
                   <div>
                     <p className="text-xs font-bold">
                       {item.code} - {item.name}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Current: {(() => {
                         const stock = typeof item.currentStock === 'number' ? item.currentStock : Number.parseFloat(String(item.currentStock).match(/^[\d.]+/)?.[0] || '0');
                         return isNaN(stock) ? '0.00' : stock.toFixed(2);
@@ -759,39 +759,39 @@ export default function InventoryPage() {
         </Card>
       )}
 
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <Card className="shadow-sm">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Items</CardTitle>
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Items</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold">{items.length}</div>
-            <p className="text-[10px] text-muted-foreground">Items in inventory</p>
+            <div className="text-2xl font-extrabold">{items.length}</div>
+            <p className="text-xs text-muted-foreground">Items in inventory</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Value</CardTitle>
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Value</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold">₹{totalValue.toFixed(2)}</div>
-            <p className="text-[10px] text-muted-foreground">Current inventory value</p>
+            <div className="text-2xl font-extrabold text-blue-600">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-xs text-muted-foreground">Current inventory value</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/30">
-            <CardTitle className="text-[11px] font-bold uppercase tracking-tight text-slate-500">Total Purchases</CardTitle>
+          <CardHeader className="py-2 px-3 border-b bg-slate-50/30">
+            <CardTitle className="text-xs font-bold uppercase tracking-tight text-slate-500">Total Purchases</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="text-lg font-bold">{purchases.length}</div>
-            <p className="text-[10px] text-muted-foreground">Purchase entries recorded</p>
+            <div className="text-2xl font-extrabold">{purchases.length}</div>
+            <p className="text-xs text-muted-foreground">Purchase entries recorded</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs value={activeTab} className="space-y-3" onValueChange={(value) => {
+      <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
         setActiveTabState(value)
         if (typeof window !== "undefined") {
           const url = new URL(window.location.href)
@@ -799,17 +799,17 @@ export default function InventoryPage() {
           window.history.pushState({}, "", url)
         }
       }}>
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto h-8 p-0.5 bg-slate-100">
-          <TabsTrigger value="items" className="text-xs h-7">Item Master</TabsTrigger>
-          <TabsTrigger value="purchases" className="text-xs h-7">Purchases</TabsTrigger>
-          <TabsTrigger value="issues" className="text-xs h-7">Issues</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto h-9 p-1 bg-slate-100">
+          <TabsTrigger value="items" className="text-xs h-7 font-bold">Item Master</TabsTrigger>
+          <TabsTrigger value="purchases" className="text-xs h-7 font-bold">Purchases</TabsTrigger>
+          <TabsTrigger value="issues" className="text-xs h-7 font-bold">Issues</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="items" className="space-y-3">
+        <TabsContent value="items" className="space-y-4">
           <Card className="shadow-sm">
-            <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
               <CardTitle className="text-sm font-bold">Item Master</CardTitle>
-              <CardDescription className="text-[10px]">Current stock and average cost</CardDescription>
+              <CardDescription className="text-xs">Current stock and average cost</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                   {items.length === 0 ? (
@@ -825,14 +825,14 @@ export default function InventoryPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="h-10 bg-slate-50/50">
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Code</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Name</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Category</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Current Stock</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Avg Cost (₹)</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Value (₹)</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Status</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-center">Actions</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Code</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Name</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Category</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Current Stock</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Avg Cost (₹)</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Value (₹)</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Status</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -893,22 +893,22 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="purchases" className="space-y-3">
+        <TabsContent value="purchases" className="space-y-4">
           <Card className="shadow-sm">
-            <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-bold">Purchase Entries</CardTitle>
-                  <CardDescription className="text-[10px]">All purchase transactions</CardDescription>
+                  <CardDescription className="text-xs">All purchase transactions</CardDescription>
                 </div>
                 {purchases.some((p) => !p.financeTransactionId) && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={syncExistingPurchasesToFinance}
-                    className="h-7 text-[10px] text-green-600 hover:text-green-700 bg-white"
+                    className="h-8 text-xs font-bold text-green-600 hover:text-green-700 bg-white"
                   >
-                    <TrendingUp className="h-3.5 w-3.5 mr-1" />
+                    <TrendingUp className="h-4 w-4 mr-1.5" />
                     Sync Finance
                   </Button>
                 )}
@@ -928,14 +928,14 @@ export default function InventoryPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="h-10 bg-slate-50/50">
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Date</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Supplier</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Item</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Qty</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Rate</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Amount</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Inv #</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-center">Actions</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Supplier</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Item</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Qty</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Rate</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Amount</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Inv #</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -999,17 +999,17 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="issues" className="space-y-3">
+        <TabsContent value="issues" className="space-y-4">
           {issues.length > 0 && (
             <Card className="shadow-sm">
-              <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
                 <CardTitle className="text-sm font-bold">Issue Summary</CardTitle>
               </CardHeader>
-              <CardContent className="p-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="p-2 bg-blue-50/50 rounded border border-blue-100">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Total Feed Issued</p>
-                    <p className="text-base font-bold text-blue-600">
+              <CardContent className="p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-blue-50/50 rounded border border-blue-100 shadow-sm">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Feed Issued</p>
+                    <p className="text-xl font-extrabold text-blue-600">
                       {issues
                         .filter((issue) => {
                           const item = getItemById(issue.itemId)
@@ -1020,9 +1020,9 @@ export default function InventoryPage() {
                       kg
                     </p>
                   </div>
-                  <div className="p-2 bg-green-50/50 rounded border border-green-100">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Total Medicine & Vaccine Cost</p>
-                    <p className="text-base font-bold text-green-600">
+                  <div className="p-3 bg-green-50/50 rounded border border-green-100 shadow-sm">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Medicine & Vaccine Cost</p>
+                    <p className="text-xl font-extrabold text-green-600">
                       ₹
                       {issues
                         .filter((issue) => {
@@ -1039,9 +1039,9 @@ export default function InventoryPage() {
           )}
 
           <Card className="shadow-sm">
-            <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
+            <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
               <CardTitle className="text-sm font-bold">Issue History</CardTitle>
-              <CardDescription className="text-[10px]">{issues.length} total issues</CardDescription>
+              <CardDescription className="text-xs">{issues.length} total issues</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {issues.length === 0 ? (
@@ -1057,13 +1057,13 @@ export default function InventoryPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="h-10 bg-slate-50/50">
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Date</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Batch</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Item</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Qty</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Cost/Unit</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight text-right">Total</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-tight">Purpose</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Batch</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Item</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Qty</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Cost/Unit</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Total</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Purpose</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
