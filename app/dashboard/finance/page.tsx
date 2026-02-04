@@ -294,9 +294,9 @@ export default function FinancePage() {
       </div>
 
       <Card className="shadow-sm border-slate-200/60">
-        <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
-          <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-slate-500 opacity-70" />
             Filter Period
           </CardTitle>
         </CardHeader>
@@ -347,29 +347,29 @@ export default function FinancePage() {
       <div className="grid gap-2 md:grid-cols-3">
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Income</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Income</CardTitle>
             <TrendingUp className="h-3.5 w-3.5 text-green-600 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black text-green-600">{formatINR(totalIncome)}</div>
+            <div className="text-xl font-black text-green-600 tracking-tight">{formatINR(totalIncome)}</div>
             <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Total received</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenses</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Expenses</CardTitle>
             <TrendingDown className="h-3.5 w-3.5 text-red-600 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black text-red-600">{formatINR(totalExpenses)}</div>
+            <div className="text-xl font-black text-red-600 tracking-tight">{formatINR(totalExpenses)}</div>
             <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Total paid out</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
             <DollarSign className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
@@ -384,7 +384,7 @@ export default function FinancePage() {
       <div className="grid gap-2 md:grid-cols-2">
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-xs font-bold">Income by Category</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Income by Category</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
             {Object.keys(incomeByCategory).length === 0 ? (
@@ -412,10 +412,10 @@ export default function FinancePage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-sm font-bold">Expenses by Category</CardTitle>
-            <CardDescription className="text-[10px]">Breakdown of spending</CardDescription>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Expenses by Category</CardTitle>
+            <CardDescription className="text-[9px] font-medium text-slate-400">Breakdown of spending</CardDescription>
           </CardHeader>
           <CardContent className="p-3">
             {Object.keys(expensesByCategory).length === 0 ? (
@@ -445,9 +445,9 @@ export default function FinancePage() {
       </div>
 
       <Card className="shadow-sm border-slate-200/60">
-        <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
-          <CardTitle className="text-sm font-bold">Transaction History</CardTitle>
-          <CardDescription className="text-[10px]">{sortedTransactions.length} transactions in period</CardDescription>
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Transaction History</CardTitle>
+          <CardDescription className="text-[9px] font-medium text-slate-400">{sortedTransactions.length} transactions in period</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {sortedTransactions.length === 0 ? (

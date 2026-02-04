@@ -728,7 +728,7 @@ export default function InventoryPage() {
       {lowStockItems.length > 0 && (
         <Card className="border-orange-200 shadow-sm bg-orange-50/20">
           <CardHeader className="py-1.5 px-3 border-b bg-orange-50/50">
-            <CardTitle className="flex items-center gap-2 text-xs font-bold text-orange-700">
+            <CardTitle className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-orange-700">
               <AlertTriangle className="h-3.5 w-3.5" />
               Low Stock Alert ({lowStockItems.length})
             </CardTitle>
@@ -761,30 +761,30 @@ export default function InventoryPage() {
       <div className="grid gap-2 md:grid-cols-3">
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Items</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Items</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black">{items.length}</div>
+            <div className="text-xl font-black tracking-tight">{items.length}</div>
             <p className="text-[10px] text-muted-foreground font-medium">Items in inventory</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Value</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Value</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black text-blue-600">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <div className="text-xl font-black text-blue-600 tracking-tight">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             <p className="text-[10px] text-muted-foreground font-medium">Current value</p>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Purchases</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Purchases</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black">{purchases.length}</div>
+            <div className="text-xl font-black tracking-tight">{purchases.length}</div>
             <p className="text-[10px] text-muted-foreground font-medium">Purchase entries</p>
           </CardContent>
         </Card>
@@ -806,9 +806,9 @@ export default function InventoryPage() {
 
         <TabsContent value="items" className="space-y-3">
           <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
-              <CardTitle className="text-sm font-bold">Item Master</CardTitle>
-              <CardDescription className="text-[10px]">Current stock and average cost</CardDescription>
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Item Master</CardTitle>
+              <CardDescription className="text-[9px] font-medium text-slate-400">Current stock and average cost</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                   {items.length === 0 ? (
@@ -894,11 +894,11 @@ export default function InventoryPage() {
 
         <TabsContent value="purchases" className="space-y-3">
           <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-sm font-bold">Purchase Entries</CardTitle>
-                  <CardDescription className="text-[10px]">All purchase transactions</CardDescription>
+                  <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Purchase Entries</CardTitle>
+                  <CardDescription className="text-[9px] font-medium text-slate-400">All purchase transactions</CardDescription>
                 </div>
                 {purchases.some((p) => !p.financeTransactionId) && (
                   <Button
@@ -1002,7 +1002,7 @@ export default function InventoryPage() {
           {issues.length > 0 && (
             <Card className="shadow-sm border-slate-200/60 bg-blue-50/10">
               <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-                <CardTitle className="text-xs font-bold">Issue Summary</CardTitle>
+                <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Issue Summary</CardTitle>
               </CardHeader>
               <CardContent className="p-2.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1038,9 +1038,9 @@ export default function InventoryPage() {
           )}
 
           <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
-              <CardTitle className="text-sm font-bold">Issue History</CardTitle>
-              <CardDescription className="text-[10px]">{issues.length} total issues</CardDescription>
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Issue History</CardTitle>
+              <CardDescription className="text-[9px] font-medium text-slate-400">{issues.length} total issues</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {issues.length === 0 ? (

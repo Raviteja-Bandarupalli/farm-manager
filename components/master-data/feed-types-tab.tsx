@@ -63,7 +63,11 @@ export function FeedTypesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Feed Types</h2>
+          <p className="text-[9px] font-medium text-slate-400">Configure nutritional profiles and pricing</p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button

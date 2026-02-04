@@ -219,28 +219,28 @@ export default function SalesPage() {
       <div className="grid gap-2 md:grid-cols-3">
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Buyers</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Buyers</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black">{uniqueBuyers}</div>
+            <div className="text-xl font-black tracking-tight">{uniqueBuyers}</div>
             <p className="text-[10px] text-muted-foreground font-medium">Buyers in system</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Sales</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Sales</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black text-blue-600">₹{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <div className="text-xl font-black text-blue-600 tracking-tight">₹{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             <p className="text-[10px] text-muted-foreground font-medium">Total sales value</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Entries</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Entries</CardTitle>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black">{(sales || []).length}</div>
+            <div className="text-xl font-black tracking-tight">{(sales || []).length}</div>
             <p className="text-[10px] text-muted-foreground font-medium">Sales entries recorded</p>
           </CardContent>
         </Card>
@@ -248,11 +248,11 @@ export default function SalesPage() {
 
       <div className="space-y-3">
         <Card className="shadow-sm border-slate-200/60">
-          <CardHeader className="py-2 px-3 border-b bg-slate-50/80">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-bold">Sales History</CardTitle>
-                <CardDescription className="text-xs">Buyer, quantity, and value details</CardDescription>
+                <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Sales History</CardTitle>
+                <CardDescription className="text-[9px] font-medium text-slate-400">Buyer, quantity, and value details</CardDescription>
               </div>
               <Dialog
                 open={isSaleDialogOpen}

@@ -725,7 +725,7 @@ export default function DailyLogsPage() {
       {weeklyFeeds.length > 0 && (
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-xs font-bold">Weekly Feed Entries</CardTitle>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Weekly Feed Entries</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -781,10 +781,10 @@ export default function DailyLogsPage() {
       )}
 
       <Card className="shadow-sm border-slate-200/60">
-        <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/80">
+        <CardHeader className="py-1.5 px-3 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/80">
           <div className="flex flex-col">
-            <CardTitle className="text-sm font-bold">Daily Logs History</CardTitle>
-            <CardDescription className="text-[10px] hidden sm:block">View recorded daily metrics</CardDescription>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Daily Logs History</CardTitle>
+            <CardDescription className="text-[9px] font-medium text-slate-400 hidden sm:block">View recorded daily metrics</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Filter className="h-3 w-3 text-slate-400" />
@@ -895,35 +895,35 @@ export default function DailyLogsPage() {
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Total Mortality</p>
-                  <p className="text-base font-black text-red-600 leading-tight">
+                  <p className="text-base font-black text-red-600 leading-tight tracking-tight">
                     {summaryMetrics.totalMortality.toLocaleString("en-IN")}
                   </p>
                 </div>
 
                 <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Closing Birds</p>
-                  <p className="text-base font-black text-slate-900 leading-tight">
+                  <p className="text-base font-black text-slate-900 leading-tight tracking-tight">
                     {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
                   </p>
                 </div>
 
                 <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Cum. Mort. %</p>
-                  <p className="text-base font-black text-orange-600 leading-tight">
+                  <p className="text-base font-black text-orange-600 leading-tight tracking-tight">
                     {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
                   </p>
                 </div>
 
                 <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Days Logged</p>
-                  <p className="text-base font-black text-slate-900 leading-tight">
+                  <p className="text-base font-black text-slate-900 leading-tight tracking-tight">
                     {summaryMetrics.daysLogged}
                   </p>
                 </div>
 
                 <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Avg. Mort/Day</p>
-                  <p className="text-base font-black text-slate-900 leading-tight">
+                  <p className="text-base font-black text-slate-900 leading-tight tracking-tight">
                     {summaryMetrics.avgMortalityPerDay.toFixed(1)}
                   </p>
                 </div>

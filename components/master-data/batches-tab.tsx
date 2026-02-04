@@ -230,8 +230,8 @@ export function BatchesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold">Batches</h2>
-          <p className="text-xs text-muted-foreground">Manage broiler batches and track flock placements</p>
+          <h2 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Batches</h2>
+          <p className="text-[9px] font-medium text-slate-400">Manage broiler batches and track flock placements</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
