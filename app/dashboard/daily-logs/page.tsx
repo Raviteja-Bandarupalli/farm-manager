@@ -379,27 +379,45 @@ export default function DailyLogsPage() {
     doc.setFontSize(10)
     doc.text(dateRangeText, pageWidth - 15, 10, { align: "right" })
 
-    // Summary Section
-    doc.setDrawColor(200)
-    doc.line(15, 35, pageWidth - 15, 35)
+    // Summary Section (Executive Summary Box)
+    const summaryY = 35
+    const summaryHeight = 35
+    doc.setFillColor(245, 245, 245) // Light grey
+    doc.rect(15, summaryY, pageWidth - 30, summaryHeight, "F")
 
     doc.setFont("helvetica", "bold")
-    doc.text("Report Summary", 15, 45)
+    doc.setFontSize(11)
+    doc.text("EXECUTIVE SUMMARY", 20, summaryY + 8)
 
+    doc.setFontSize(10)
+    // Left Column
+    doc.setFont("helvetica", "bold")
+    doc.text("Total Mortality:", 20, summaryY + 18)
     doc.setFont("helvetica", "normal")
-    doc.text(`Total Mortality: ${summaryMetrics.totalMortality}`, 15, 52)
-    doc.text(`Closing Birds: ${summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}`, 15, 59)
+    doc.text(`${summaryMetrics.totalMortality}`, 65, summaryY + 18)
 
-    // Logic: Red text if Cum. Mort % > 5.00%
+    doc.setFont("helvetica", "bold")
+    doc.text("Cum. Mort %:", 20, summaryY + 28)
     if (summaryMetrics.latestCumMortalityPercent > 5) {
       doc.setTextColor(255, 0, 0)
     }
-    doc.text(`Cumulative Mortality %: ${summaryMetrics.latestCumMortalityPercent.toFixed(2)}%`, 15, 66)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.latestCumMortalityPercent.toFixed(2)}%`, 65, summaryY + 28)
     doc.setTextColor(0, 0, 0) // Reset
 
-    doc.text(`Average Mortality/Day: ${summaryMetrics.avgMortalityPerDay.toFixed(1)}`, 15, 73)
+    // Right Column
+    const rightColX = pageWidth / 2 + 5
+    const rightValueX = rightColX + 45
 
-    doc.line(15, 78, pageWidth - 15, 78)
+    doc.setFont("helvetica", "bold")
+    doc.text("Closing Birds:", rightColX, summaryY + 18)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}`, rightValueX, summaryY + 18)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Avg. Mort/Day:", rightColX, summaryY + 28)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.avgMortalityPerDay.toFixed(1)}`, rightValueX, summaryY + 28)
 
     // Data Table
     const tableHeaders = [["Date", "Farm/House", "Mortality", "Cum. Mort %", "Feed Type", "Closing"]]
@@ -413,17 +431,19 @@ export default function DailyLogsPage() {
     ])
 
     autoTable(doc, {
-      startY: 85,
+      startY: summaryY + summaryHeight + 10,
       head: tableHeaders,
       body: tableRows,
       theme: "striped",
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      styles: { fontSize: 9 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: 'center' },
+      styles: { fontSize: 9, cellPadding: 3 },
       columnStyles: {
-        0: { cellWidth: 30 },
-        2: { halign: 'center' },
-        3: { halign: 'center' },
-        5: { halign: 'right' }
+        0: { cellWidth: 25, halign: 'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center' },
+        4: { cellWidth: 35 },
+        5: { cellWidth: 25, halign: 'center' } // Center Aligned Closing
       }
     })
 
