@@ -18,6 +18,14 @@ import { filterVisibleFarms, filterVisibleHouses, filterVisibleBatches, canAcces
 import { getFirstDayOfMonth, getLastDayOfMonth } from "@/lib/date-utils"
 import { getTodayDate } from "@/lib/date-utils"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Progress } from "@/components/ui/progress"
+import {
   LineChart,
   Line,
   BarChart,
@@ -35,16 +43,44 @@ import {
 
 export default function DashboardPage() {
   const [showFinancials, setShowFinancials] = useState(true)
+  const [selectedLocation, setSelectedLocation] = useState("All")
   const { user } = useAuth()
   const { farms: allFarms, houses: allHouses, suppliers, buyers, feedTypes } = useMasterData()
-  const { dailyLogs } = useDailyLogs()
-  const { items, issues, getLowStockItems, getTotalBirdsSold, getTotalRevenue } = useInventory()
+  const { dailyLogs: allDailyLogs } = useDailyLogs()
+  const { items, issues: allIssues, getLowStockItems, getTotalBirdsSold, getTotalRevenue } = useInventory()
   const { getTotalIncome, getTotalExpenses, getBalance } = useFinance()
   const { batches: allBatches } = useBatch()
 
-  const farms = filterVisibleFarms(user, allFarms)
-  const houses = filterVisibleHouses(user, allHouses, allFarms)
-  const batches = filterVisibleBatches(user, allBatches, allHouses, allFarms)
+  const filteredFarms = useMemo(() => {
+    const visibleFarms = filterVisibleFarms(user, allFarms)
+    if (selectedLocation === "All") return visibleFarms
+    return visibleFarms.filter((f) => f.location === selectedLocation)
+  }, [user, allFarms, selectedLocation])
+
+  const farms = filteredFarms
+  const filteredHouseIds = useMemo(() => {
+    return filterVisibleHouses(user, allHouses, allFarms)
+      .filter((h) => filteredFarms.some((f) => f.id === h.farmId))
+      .map((h) => h.id)
+  }, [user, allHouses, allFarms, filteredFarms])
+
+  const houses = allHouses.filter((h) => filteredHouseIds.includes(h.id))
+
+  const batches = useMemo(() => {
+    return filterVisibleBatches(user, allBatches, allHouses, allFarms).filter((b) =>
+      filteredHouseIds.includes(b.houseId),
+    )
+  }, [user, allBatches, allHouses, allFarms, filteredHouseIds])
+
+  const dailyLogs = useMemo(() => {
+    const batchIds = batches.map((b) => b.id)
+    return allDailyLogs.filter((log) => batchIds.includes(log.batchId))
+  }, [allDailyLogs, batches])
+
+  const issues = useMemo(() => {
+    const batchIds = batches.map((b) => b.id)
+    return allIssues.filter((iss) => batchIds.includes(iss.batchId))
+  }, [allIssues, batches])
 
   const startOfMonth = getFirstDayOfMonth()
   const endOfMonth = getLastDayOfMonth()
@@ -55,6 +91,37 @@ export default function DashboardPage() {
 
   const lowStockItems = getLowStockItems()
 
+  // Calculate Days of Feed Left
+  const feedLeftData = useMemo(() => {
+    const feedItems = items.filter((i) => i.category.startsWith("feed"))
+    const totalFeedStock = feedItems.reduce((sum, i) => sum + i.currentStock, 0)
+
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = yesterday.toISOString().split("T")[0]
+
+    const yesterdayConsumption = issues
+      .filter((iss) => iss.date === yesterdayStr && feedItems.some(fi => fi.id === iss.itemId))
+      .reduce((sum, iss) => sum + iss.quantity, 0)
+
+    // Fallback to average if yesterday was 0
+    let consumptionToUse = yesterdayConsumption
+    if (consumptionToUse === 0) {
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() - (i + 1))
+        return d.toISOString().split("T")[0]
+      })
+      const weekConsumption = issues
+        .filter((iss) => last7Days.includes(iss.date) && feedItems.some(fi => fi.id === iss.itemId))
+        .reduce((sum, iss) => sum + iss.quantity, 0)
+      consumptionToUse = weekConsumption / 7
+    }
+
+    const daysLeft = consumptionToUse > 0 ? Math.floor(totalFeedStock / consumptionToUse) : 0
+    return { totalFeedStock, daysLeft, consumptionToUse }
+  }, [items, issues])
+
   const activeBatches = batches.filter((b) => b.status === "active")
   const activeBatchCount = activeBatches.length
 
@@ -62,6 +129,7 @@ export default function DashboardPage() {
   let avgFCR = 0
   let avgMortality = 0
   let avgTargetFCR = 0
+  let avgAgeDays = 0
   const performanceAlerts: any[] = []
 
   let totalInitialBirds = 0
@@ -71,10 +139,16 @@ export default function DashboardPage() {
     let fcrSum = 0
     let fcrCount = 0
     let targetFCRSum = 0
+    let ageSum = 0
 
     console.log("[v0] Calculating live birds for", activeBatches.length, "active batches")
 
     activeBatches.forEach((batch) => {
+      const today = new Date().getTime()
+      const placement = toDateKey(batch.placementDate)
+      const age = Math.max(0, Math.ceil((today - placement) / (1000 * 60 * 60 * 24)))
+      ageSum += age
+
       const batchLogs = dailyLogs.filter((log) => log.batchId === batch.id).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
       const latestLog = batchLogs[0]
 
@@ -139,6 +213,7 @@ export default function DashboardPage() {
 
     avgFCR = fcrCount > 0 ? fcrSum / fcrCount : 0
     avgTargetFCR = activeBatches.length > 0 ? targetFCRSum / activeBatches.length : 0
+    avgAgeDays = activeBatches.length > 0 ? Math.round(ageSum / activeBatches.length) : 0
   }
   
   // Calculate mortality - use cumulative from logs if available, otherwise sum all mortalities
@@ -187,13 +262,16 @@ export default function DashboardPage() {
     })
 
     return last14Days.map((date) => {
-      const dailyMortality = dailyLogs
-        .filter((log) => log.date === date)
-        .reduce((sum, log) => sum + (log.mortality || 0), 0)
+      const logsOnDay = dailyLogs.filter((log) => log.date === date)
+      const totalMortality = logsOnDay.reduce((sum, log) => sum + (log.mortality || 0), 0)
+      const totalOpeningBirds = logsOnDay.reduce((sum, log) => sum + (log.openingBirds || 0), 0)
+
+      const dailyMortalityPercent = totalOpeningBirds > 0 ? (totalMortality / totalOpeningBirds) * 100 : 0
 
       return {
         date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
-        mortality: dailyMortality,
+        mortalityPercent: Number(dailyMortalityPercent.toFixed(3)),
+        standard: 0.1,
       }
     })
   }, [dailyLogs])
@@ -247,16 +325,31 @@ export default function DashboardPage() {
           <h1 className="text-xl font-extrabold tracking-tight">B.N.Rao Poultry Farms | Executive Dashboard</h1>
           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Comprehensive Farm Insights</p>
         </div>
-        <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-          <Label htmlFor="financial-view" className="text-[10px] font-bold uppercase tracking-tight text-slate-600 flex items-center gap-1.5 cursor-pointer">
-            {showFinancials ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-            Financial View
-          </Label>
-          <Switch
-            id="financial-view"
-            checked={showFinancials}
-            onCheckedChange={setShowFinancials}
-          />
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="location-filter" className="text-[10px] font-bold uppercase tracking-tight text-slate-600">Location:</Label>
+            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+              <SelectTrigger id="location-filter" size="sm" className="w-[120px] h-8 text-[11px] font-bold bg-white">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Regions</SelectItem>
+                <SelectItem value="Satuluru">Satuluru</SelectItem>
+                <SelectItem value="Guntur">Guntur</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <Label htmlFor="financial-view" className="text-[10px] font-bold uppercase tracking-tight text-slate-600 flex items-center gap-1.5 cursor-pointer">
+              {showFinancials ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+              Financial View
+            </Label>
+            <Switch
+              id="financial-view"
+              checked={showFinancials}
+              onCheckedChange={setShowFinancials}
+            />
+          </div>
         </div>
       </div>
 
@@ -281,16 +374,24 @@ export default function DashboardPage() {
             <Activity className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black tracking-tight">{totalLiveBirds.toLocaleString("en-IN")}</div>
-            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-              {activeBatchCount} active batches
-            </p>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-xl font-black tracking-tight">{totalLiveBirds.toLocaleString("en-IN")}</div>
+                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                  Avg. Age: <span className="font-bold text-slate-900">{avgAgeDays} Days</span>
+                </p>
+              </div>
+              <div className="text-right w-20">
+                <p className="text-[8px] font-extrabold text-slate-400 uppercase mb-1">Day {avgAgeDays}/40</p>
+                <Progress value={(avgAgeDays / 40) * 100} className="h-1 bg-slate-100" />
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">FCR (Current)</CardTitle>
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Flock Efficiency</CardTitle>
             <TrendingUp className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
@@ -512,13 +613,18 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-slate-600">Low Stock</span>
-                  <Badge variant="secondary" className={`${lowStockItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-green-100 text-green-700 border-green-200"} text-[10px] font-bold h-5 px-2`}>
-                    {lowStockItems.length}
-                  </Badge>
+                  <span className="text-xs font-semibold text-slate-600">Feed Stock</span>
+                  <span className="text-xs font-extrabold text-slate-700">{feedLeftData.totalFeedStock.toLocaleString()} kg</span>
+                </div>
+                <div className="mt-2 p-2 bg-slate-50 rounded border border-slate-100">
+                  <p className="text-[8px] font-extrabold text-slate-400 uppercase mb-0.5">Estimated Duration</p>
+                  <p className="text-sm font-black text-slate-900">
+                    {feedLeftData.daysLeft} <span className="text-[10px] font-bold text-slate-500 uppercase">Days of feed left</span>
+                  </p>
+                  <Progress value={Math.min((feedLeftData.daysLeft / 7) * 100, 100)} className={`h-1 mt-1 ${feedLeftData.daysLeft < 3 ? 'bg-red-100' : 'bg-green-100'}`} />
                 </div>
               </div>
-              <Button asChild variant="outline" className="w-full mt-4 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
+              <Button asChild variant="outline" className="w-full mt-3 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
                 <Link href="/dashboard/inventory">View Inventory</Link>
               </Button>
             </CardContent>
@@ -541,13 +647,25 @@ export default function DashboardPage() {
                   <Tooltip
                     contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "10px", fontWeight: "bold" }}
                   />
+                  <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                   <Line
                     type="monotone"
-                    dataKey="mortality"
+                    dataKey="mortalityPercent"
+                    name="Daily Mortality %"
                     stroke="#ef4444"
                     strokeWidth={3}
                     dot={{ r: 3, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }}
                     activeDot={{ r: 5, strokeWidth: 0 }}
+                  />
+                  <Line
+                    type="step"
+                    dataKey="standard"
+                    name="Standard (0.1%)"
+                    stroke="#94a3b8"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    activeDot={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
