@@ -15,7 +15,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Trash2, Filter, TrendingUp, Edit, Calendar, Download } from "lucide-react"
+import { Plus, Trash2, Filter, TrendingUp, Edit, Calendar, FileText } from "lucide-react"
+import { jsPDF } from "jspdf"
+import autoTable from "jspdf-autotable"
 import {
   Dialog,
   DialogContent,
@@ -354,31 +356,79 @@ export default function DailyLogsPage() {
       : 0
   }
 
-  const downloadCSV = () => {
+  const downloadPDF = () => {
     if (sortedLogs.length === 0) return
 
-    const headers = ["Date", "Farm", "House", "Mortality", "Cum. Mort %", "Feed Type", "Closing Birds", "Remarks"]
-    const rows = sortedLogs.map((log) => [
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+
+    // Header: B.N.Rao Poultry Farms
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(18)
+    doc.text("B.N.Rao Poultry Farms", pageWidth / 2, 20, { align: "center" })
+
+    // Sub-header
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "normal")
+    doc.text("Daily Production & Mortality Report", pageWidth / 2, 28, { align: "center" })
+
+    // Top-right Date Range
+    const dateRangeText = startDate && endDate
+      ? `Date: ${formatIndianDate(startDate)} to ${formatIndianDate(endDate)}`
+      : `Date: ${formatIndianDate(getTodayDate())}`
+    doc.setFontSize(10)
+    doc.text(dateRangeText, pageWidth - 15, 10, { align: "right" })
+
+    // Summary Section
+    doc.setDrawColor(200)
+    doc.line(15, 35, pageWidth - 15, 35)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Report Summary", 15, 45)
+
+    doc.setFont("helvetica", "normal")
+    doc.text(`Total Mortality: ${summaryMetrics.totalMortality}`, 15, 52)
+    doc.text(`Closing Birds: ${summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}`, 15, 59)
+
+    // Logic: Red text if Cum. Mort % > 5.00%
+    if (summaryMetrics.latestCumMortalityPercent > 5) {
+      doc.setTextColor(255, 0, 0)
+    }
+    doc.text(`Cumulative Mortality %: ${summaryMetrics.latestCumMortalityPercent.toFixed(2)}%`, 15, 66)
+    doc.setTextColor(0, 0, 0) // Reset
+
+    doc.text(`Average Mortality/Day: ${summaryMetrics.avgMortalityPerDay.toFixed(1)}`, 15, 73)
+
+    doc.line(15, 78, pageWidth - 15, 78)
+
+    // Data Table
+    const tableHeaders = [["Date", "Farm/House", "Mortality", "Cum. Mort %", "Feed Type", "Closing"]]
+    const tableRows = sortedLogs.map(log => [
       formatIndianDate(log.date),
-      getFarmName(log.houseId),
-      getHouseName(log.houseId),
+      `${getFarmName(log.houseId)} / ${getHouseName(log.houseId)}`,
       log.mortality,
       `${log.cumulativeMortalityPercent.toFixed(2)}%`,
       getFeedTypeName(log.feedTypeId),
-      log.closingBirds,
-      `"${(log.remarks || "").replace(/"/g, '""')}"`,
+      log.closingBirds.toLocaleString("en-IN")
     ])
 
-    const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `daily_logs_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    autoTable(doc, {
+      startY: 85,
+      head: tableHeaders,
+      body: tableRows,
+      theme: "striped",
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      styles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        5: { halign: 'right' }
+      }
+    })
+
+    const reportDate = new Date().toISOString().split("T")[0]
+    doc.save(`BNRao_Farms_Report_${reportDate}.pdf`)
   }
 
   const startAddNewLog = () => {
@@ -414,9 +464,9 @@ export default function DailyLogsPage() {
           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Track daily metrics for your flocks</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={downloadCSV} variant="outline" size="sm" className="h-8 text-xs font-bold" disabled={sortedLogs.length === 0}>
-            <Download className="h-4 w-4 mr-1.5" />
-            Download CSV
+          <Button onClick={downloadPDF} variant="outline" size="sm" className="h-8 text-xs font-bold" disabled={sortedLogs.length === 0}>
+            <FileText className="h-4 w-4 mr-1.5" />
+            Download PDF
           </Button>
           {user && user.role === "owner" && (
             <Dialog open={isWeeklyFeedDialogOpen} onOpenChange={setIsWeeklyFeedDialogOpen}>
