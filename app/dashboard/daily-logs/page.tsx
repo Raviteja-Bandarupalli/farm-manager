@@ -142,7 +142,7 @@ export default function DailyLogsPage() {
   // Use section mortality if sections exist, otherwise use formData.mortality
   const finalMortality = batchSections.length > 0 
     ? totalMortality 
-    : Number.parseInt(formData.mortality || "0")
+    : Number.parseInt(formData.mortality || "0", 10) || 0
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -324,8 +324,14 @@ export default function DailyLogsPage() {
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
   const accessibleLogs = filteredLogs.filter((log) => {
+    // If houseId is missing, show it (as "Unknown House")
+    if (!log.houseId) return true
     const house = allHouses.find((h) => h.id === log.houseId)
-    if (!house) return false
+    // If house not found in master data, show it
+    if (!house) return true
+    // If it's an owner, they see everything
+    if (user?.role === "owner") return true
+    // Otherwise check farm access
     return farms.some((f) => f.id === house.farmId)
   })
   const sortedLogs = [...accessibleLogs].sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
@@ -356,6 +362,14 @@ export default function DailyLogsPage() {
     setMortalityBySection({})
     setLastSavedLog(null)
     setIsDialogOpen(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   return (

@@ -10,18 +10,26 @@ import { useWeeklyFeed } from "./weekly-feed-context"
 
 export function toDateKey(dateStr: string): number {
   if (!dateStr) return 0
-  if (dateStr.includes("-")) {
-    const parts = dateStr.split("-")
-    if (parts[0].length === 4) {
-      // YYYY-MM-DD
-      return new Date(dateStr + "T00:00:00Z").getTime()
-    } else {
-      // DD-MM-YYYY
-      const [dd, mm, yyyy] = parts
-      return new Date(`${yyyy}-${mm}-${dd}T00:00:00Z`).getTime()
+  try {
+    if (dateStr.includes("-")) {
+      const parts = dateStr.split("-")
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        const d = new Date(dateStr + "T00:00:00Z")
+        return isNaN(d.getTime()) ? 0 : d.getTime()
+      } else {
+        // DD-MM-YYYY
+        const [dd, mm, yyyy] = parts
+        const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00Z`)
+        return isNaN(d.getTime()) ? 0 : d.getTime()
+      }
     }
+    const fallback = new Date(dateStr)
+    return isNaN(fallback.getTime()) ? 0 : fallback.getTime()
+  } catch (e) {
+    console.error("Error parsing date:", dateStr, e)
+    return 0
   }
-  return new Date(dateStr).getTime()
 }
 
 export interface DailyLog {
@@ -80,25 +88,27 @@ function recalculateBatchLogs(
   const batch = batches.find((b) => b.id === batchId)
   const initialBirds = batch?.initialBirds ?? 0
 
-  // Get all logs for this batch and sort them by date
-  // Using a Map to ensure only one log per date (last one wins if duplicates exist)
-  const logsByDate = new Map<string, DailyLog>()
-  allLogs
-    .filter((l) => l.batchId === batchId)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .forEach(l => logsByDate.set(l.date, l))
+  // Get all logs for this batch
+  const batchLogs = allLogs.filter((l) => l.batchId === batchId)
 
-  const sortedLogs = Array.from(logsByDate.values()).sort((a, b) => toDateKey(a.date) - toDateKey(b.date))
+  // Sort them by date, then by createdAt to maintain a stable order
+  const sortedLogs = [...batchLogs].sort((a, b) => {
+    const dateDiff = toDateKey(a.date) - toDateKey(b.date)
+    if (dateDiff !== 0) return dateDiff
+    return (a.createdAt || "").localeCompare(b.createdAt || "")
+  })
 
   const out: DailyLog[] = []
   let runningCumulativeMortality = 0
 
   for (let i = 0; i < sortedLogs.length; i++) {
     const cur = sortedLogs[i]
+    // If multiple logs exist for the same day, opening birds for subsequent logs
+    // should be the closing birds of the previous log (even on the same day)
     const openingBirds = i === 0 ? initialBirds : out[i - 1].closingBirds
-    const closingBirds = openingBirds - cur.mortality
+    const closingBirds = openingBirds - (cur.mortality || 0)
 
-    runningCumulativeMortality += cur.mortality
+    runningCumulativeMortality += (cur.mortality || 0)
 
     const curDateKey = toDateKey(cur.date)
     const cumulativeFeed = weeklyFeeds
@@ -168,9 +178,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       | "cumulativeFCR"
     >,
   ): Promise<DailyLog> => {
-    const existing = dailyLogs.find((l) => l.batchId === log.batchId && l.date === log.date)
-    if (existing) throw new Error(`A daily log already exists for this batch on ${log.date}. Only one entry per day is allowed.`)
-    
     // Generate a unique ID and createdAt
     const logId = Date.now().toString() + Math.random().toString(36).slice(2, 9)
     const createdAt = new Date().toISOString()
