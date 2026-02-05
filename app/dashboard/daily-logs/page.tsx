@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Trash2, Filter, TrendingUp, Edit, Calendar } from "lucide-react"
+import { Plus, Trash2, Filter, TrendingUp, Edit, Calendar, Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,8 @@ export default function DailyLogsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isWeeklyFeedDialogOpen, setIsWeeklyFeedDialogOpen] = useState(false)
   const [filterHouse, setFilterHouse] = useState<string>("all")
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
   const [lastSavedLog, setLastSavedLog] = useState<any>(null)
   const [editingLog, setEditingLog] = useState<string | null>(null)
   const [editBatchId, setEditBatchId] = useState<string | null>(null)
@@ -324,6 +326,11 @@ export default function DailyLogsPage() {
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
   const accessibleLogs = filteredLogs.filter((log) => {
+    // Apply date range filter
+    const logTime = toDateKey(log.date)
+    if (startDate && logTime < toDateKey(startDate)) return false
+    if (endDate && logTime > toDateKey(endDate)) return false
+
     // If houseId is missing, show it (as "Unknown House")
     if (!log.houseId) return true
     const house = allHouses.find((h) => h.id === log.houseId)
@@ -345,6 +352,33 @@ export default function DailyLogsPage() {
     avgMortalityPerDay: sortedLogs.length > 0
       ? sortedLogs.reduce((sum, log) => sum + log.mortality, 0) / sortedLogs.length
       : 0
+  }
+
+  const downloadCSV = () => {
+    if (sortedLogs.length === 0) return
+
+    const headers = ["Date", "Farm", "House", "Mortality", "Cum. Mort %", "Feed Type", "Closing Birds", "Remarks"]
+    const rows = sortedLogs.map((log) => [
+      formatIndianDate(log.date),
+      getFarmName(log.houseId),
+      getHouseName(log.houseId),
+      log.mortality,
+      `${log.cumulativeMortalityPercent.toFixed(2)}%`,
+      getFeedTypeName(log.feedTypeId),
+      log.closingBirds,
+      `"${(log.remarks || "").replace(/"/g, '""')}"`,
+    ])
+
+    const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `daily_logs_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const startAddNewLog = () => {
@@ -380,6 +414,10 @@ export default function DailyLogsPage() {
           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Track daily metrics for your flocks</p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={downloadCSV} variant="outline" size="sm" className="h-8 text-xs font-bold" disabled={sortedLogs.length === 0}>
+            <Download className="h-4 w-4 mr-1.5" />
+            Download CSV
+          </Button>
           {user && user.role === "owner" && (
             <Dialog open={isWeeklyFeedDialogOpen} onOpenChange={setIsWeeklyFeedDialogOpen}>
               <DialogTrigger asChild>
@@ -736,6 +774,43 @@ export default function DailyLogsPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2">
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Total Mortality</p>
+          <p className="text-lg font-black text-red-600 leading-tight tracking-tight">
+            {summaryMetrics.totalMortality.toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Closing Birds</p>
+          <p className="text-lg font-black text-slate-900 leading-tight tracking-tight">
+            {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        <div className={`bg-white p-2.5 rounded-lg border shadow-sm ${summaryMetrics.latestCumMortalityPercent > 5 ? 'border-red-500 bg-red-50/30' : 'border-slate-200/60'}`}>
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Cum. Mort. %</p>
+          <p className={`text-lg font-black leading-tight tracking-tight ${summaryMetrics.latestCumMortalityPercent > 5 ? 'text-red-600' : 'text-orange-600'}`}>
+            {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
+          </p>
+        </div>
+
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Days Logged</p>
+          <p className="text-lg font-black text-slate-900 leading-tight tracking-tight">
+            {summaryMetrics.daysLogged}
+          </p>
+        </div>
+
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Avg. Mort/Day</p>
+          <p className="text-lg font-black text-slate-900 leading-tight tracking-tight">
+            {summaryMetrics.avgMortalityPerDay.toFixed(1)}
+          </p>
+        </div>
+      </div>
+
       {weeklyFeeds.length > 0 && (
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
@@ -802,8 +877,32 @@ export default function DailyLogsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Filter className="h-3 w-3 text-slate-400" />
+            <div className="flex items-center gap-1 bg-white border rounded-md px-1.5 h-7">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">From:</span>
+              <input
+                type="date"
+                className="text-[10px] border-none focus:ring-0 p-0 w-24 bg-transparent outline-none"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+              <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">To:</span>
+              <input
+                type="date"
+                className="text-[10px] border-none focus:ring-0 p-0 w-24 bg-transparent outline-none"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => { setStartDate(""); setEndDate(""); }}
+                  className="text-[9px] font-bold text-red-500 uppercase ml-1 hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <Select value={filterHouse} onValueChange={setFilterHouse}>
-              <SelectTrigger className="h-7 w-[140px] text-[11px] font-medium bg-white">
+              <SelectTrigger className="h-7 w-[110px] text-[11px] font-medium bg-white">
                 <SelectValue placeholder="All Houses" />
               </SelectTrigger>
               <SelectContent>
@@ -901,49 +1000,6 @@ export default function DailyLogsPage() {
             </Table>
           </div>
 
-          {sortedLogs.length > 0 && (
-            <div className="mt-1 pt-1.5 border-t border-slate-100 px-3 pb-2.5 bg-slate-50/30">
-              <h3 className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 mb-1.5 px-1">
-                Batch Summary (Filtered)
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Total Mortality</p>
-                  <p className="text-base font-black text-red-600 leading-tight tracking-tight">
-                    {summaryMetrics.totalMortality.toLocaleString("en-IN")}
-                  </p>
-                </div>
-
-                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Closing Birds</p>
-                  <p className="text-base font-black text-slate-900 leading-tight tracking-tight">
-                    {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
-                  </p>
-                </div>
-
-                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Cum. Mort. %</p>
-                  <p className="text-base font-black text-orange-600 leading-tight tracking-tight">
-                    {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
-                  </p>
-                </div>
-
-                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Days Logged</p>
-                  <p className="text-base font-black text-slate-900 leading-tight tracking-tight">
-                    {summaryMetrics.daysLogged}
-                  </p>
-                </div>
-
-                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Avg. Mort/Day</p>
-                  <p className="text-base font-black text-slate-900 leading-tight tracking-tight">
-                    {summaryMetrics.avgMortalityPerDay.toFixed(1)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
