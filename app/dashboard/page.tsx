@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useMemo } from "react"
 import { useMasterData } from "@/lib/master-data-context"
 import { useDailyLogs, toDateKey } from "@/lib/daily-logs-context"
 import { useInventory } from "@/lib/inventory-context"
@@ -7,18 +8,37 @@ import { useFinance } from "@/lib/finance-context"
 import { useBatch } from "@/lib/batch-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, Home, Package, DollarSign, TrendingUp, AlertTriangle, Activity, Users } from "lucide-react"
+import { Building2, Home, Package, DollarSign, TrendingUp, AlertTriangle, Activity, Users, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/auth-context"
 import { filterVisibleFarms, filterVisibleHouses, filterVisibleBatches, canAccessFinance } from "@/lib/permissions"
 import { getFirstDayOfMonth, getLastDayOfMonth } from "@/lib/date-utils"
+import { getTodayDate } from "@/lib/date-utils"
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts"
 
 export default function DashboardPage() {
+  const [showFinancials, setShowFinancials] = useState(true)
   const { user } = useAuth()
   const { farms: allFarms, houses: allHouses, suppliers, buyers, feedTypes } = useMasterData()
   const { dailyLogs } = useDailyLogs()
-  const { items, getLowStockItems, getTotalBirdsSold, getTotalRevenue } = useInventory()
+  const { items, issues, getLowStockItems, getTotalBirdsSold, getTotalRevenue } = useInventory()
   const { getTotalIncome, getTotalExpenses, getBalance } = useFinance()
   const { batches: allBatches } = useBatch()
 
@@ -158,26 +178,99 @@ export default function DashboardPage() {
 
   const activeHouses = houses.filter((h) => h.status === "active").length
 
+  // Mortality Trend (Last 14 days)
+  const mortalityTrendData = useMemo(() => {
+    const last14Days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (13 - i))
+      return d.toISOString().split("T")[0]
+    })
+
+    return last14Days.map((date) => {
+      const dailyMortality = dailyLogs
+        .filter((log) => log.date === date)
+        .reduce((sum, log) => sum + (log.mortality || 0), 0)
+
+      return {
+        date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        mortality: dailyMortality,
+      }
+    })
+  }, [dailyLogs])
+
+  // Feed vs. Growth (Last 14 days)
+  const feedVsGrowthData = useMemo(() => {
+    const last14Days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (13 - i))
+      return d.toISOString().split("T")[0]
+    })
+
+    return last14Days.map((date) => {
+      const feedItems = items.filter((i) => i.category.startsWith("feed"))
+      const feedItemIds = feedItems.map((i) => i.id)
+
+      const dailyFeedKg = issues
+        .filter((iss) => iss.date === date && feedItemIds.includes(iss.itemId))
+        .reduce((sum, iss) => sum + iss.quantity, 0)
+
+      const feedBags = dailyFeedKg / 50
+
+      const logsOnDay = dailyLogs.filter((log) => log.date === date)
+      const avgCumMortalityPercent =
+        logsOnDay.length > 0 ? logsOnDay.reduce((sum, log) => sum + (log.cumulativeMortalityPercent || 0), 0) / logsOnDay.length : 0
+
+      return {
+        date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        feedBags: Number(feedBags.toFixed(1)),
+        mortalityPercent: Number(avgCumMortalityPercent.toFixed(2)),
+      }
+    })
+  }, [dailyLogs, issues, items])
+
+  const todayStr = getTodayDate()
+  const logsToday = dailyLogs.filter((l) => l.date === todayStr).length
+  const totalActiveHouses = activeBatches.length
+
+  const progressData = [
+    { name: "Completed", value: logsToday },
+    { name: "Remaining", value: Math.max(0, totalActiveHouses - logsToday) },
+  ]
+
   const formatINR = (amount: number) =>
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
   return (
     <div className="space-y-3">
-      <div className="mb-2">
-        <h1 className="text-xl font-extrabold tracking-tight">Dashboard</h1>
-        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Farm overview</p>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight">B.N.Rao Poultry Farms | Executive Dashboard</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Comprehensive Farm Insights</p>
+        </div>
+        <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+          <Label htmlFor="financial-view" className="text-[10px] font-bold uppercase tracking-tight text-slate-600 flex items-center gap-1.5 cursor-pointer">
+            {showFinancials ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+            Financial View
+          </Label>
+          <Switch
+            id="financial-view"
+            checked={showFinancials}
+            onCheckedChange={setShowFinancials}
+          />
+        </div>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+      {/* Row 1: Operations */}
+      <div className="grid gap-2 md:grid-cols-3">
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Farms</CardTitle>
-            <Building2 className="h-3.5 w-3.5 text-slate-400 opacity-70" />
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Active Houses</CardTitle>
+            <Home className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black tracking-tight">{farms.length}</div>
+            <div className="text-xl font-black tracking-tight">{activeHouses}</div>
             <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-              {activeHouses}/{houses.length} active houses
+              Across {farms.length} farms
             </p>
           </CardContent>
         </Card>
@@ -197,22 +290,25 @@ export default function DashboardPage() {
 
         <Card className="shadow-sm border-slate-200/60">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Performance</CardTitle>
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">FCR (Current)</CardTitle>
             <TrendingUp className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
           <CardContent className="p-2.5">
             <div className={`text-xl font-black tracking-tight ${avgFCR <= avgTargetFCR ? "text-green-600" : "text-orange-600"}`}>
               {avgFCR > 0 ? avgFCR.toFixed(2) : "N/A"} <span className="text-[10px] font-bold text-muted-foreground uppercase ml-0.5">FCR</span>
             </div>
-            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-              Mortality: {avgMortality.toFixed(1)}%
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5 flex items-center gap-1">
+              Mortality: <span className={`font-bold ${avgMortality > 5 ? 'text-red-600' : avgMortality > 2 ? 'text-orange-500' : 'text-green-600'}`}>{avgMortality.toFixed(1)}%</span>
             </p>
           </CardContent>
         </Card>
+      </div>
 
-        {canAccessFinance(user) && (
-          <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+      {/* Row 2: Financials (Conditional) */}
+      {showFinancials && canAccessFinance(user) && (
+        <div className="grid gap-2 md:grid-cols-3 bg-slate-100/50 p-2 rounded-xl border border-slate-200/60 shadow-inner">
+          <Card className="shadow-sm border-slate-200/60 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
               <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
               <DollarSign className="h-3.5 w-3.5 text-slate-400 opacity-70" />
             </CardHeader>
@@ -223,8 +319,30 @@ export default function DashboardPage() {
               <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{monthlyBalance >= 0 ? "Profit" : "Loss"} this month</p>
             </CardContent>
           </Card>
-        )}
-      </div>
+
+          <Card className="shadow-sm border-slate-200/60 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
+              <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Expenses</CardTitle>
+              <Package className="h-3.5 w-3.5 text-slate-400 opacity-70" />
+            </CardHeader>
+            <CardContent className="p-2.5">
+              <div className="text-xl font-black text-red-600 tracking-tight">{formatINR(monthlyExpenses)}</div>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Current month</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-slate-200/60 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
+              <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Income</CardTitle>
+              <TrendingUp className="h-3.5 w-3.5 text-slate-400 opacity-70" />
+            </CardHeader>
+            <CardContent className="p-2.5">
+              <div className="text-xl font-black text-green-600 tracking-tight">{formatINR(monthlyIncome)}</div>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Current month</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {(lowStockItems.length > 0 || performanceAlerts.length > 0) && (
         <div className="grid gap-3">
@@ -408,101 +526,115 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card className="shadow-sm border-slate-200/60">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4 shadow-sm border-slate-200/60">
           <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
-              <Activity className="h-3.5 w-3.5 text-slate-500 opacity-70" />
-              Activity Summary
-            </CardTitle>
-            <CardDescription className="text-[9px] font-medium text-slate-400">Last 30 days</CardDescription>
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Mortality Trend (Last 14 Days)</CardTitle>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Logs Recorded</span>
-                  <span className="font-black text-base text-primary tracking-tight">{recentLogs.length}</span>
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-primary h-full rounded-full"
-                    style={{ width: `${Math.min((recentLogs.length / 30) * 100, 100)}%` }}
+          <CardContent className="p-4">
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={mortalityTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "10px", fontWeight: "bold" }}
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="p-2.5 bg-slate-50/50 rounded-lg border border-slate-100 shadow-sm">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold mb-0.5 tracking-wider">Total Mortality</p>
-                  <p className="text-lg font-black text-red-600 tracking-tight">{totalMortality}</p>
-                </div>
-                <div className="p-2.5 bg-slate-50/50 rounded-lg border border-slate-100 shadow-sm">
-                  <p className="text-[9px] text-slate-400 uppercase font-bold mb-0.5 tracking-wider">Feed Consumed</p>
-                  <p className="text-lg font-black text-slate-800 tracking-tight">{totalFeedConsumed.toFixed(0)} <span className="text-[9px] font-bold text-slate-400">kg</span></p>
-                </div>
-              </div>
+                  <Line
+                    type="monotone"
+                    dataKey="mortality"
+                    stroke="#ef4444"
+                    strokeWidth={3}
+                    dot={{ r: 3, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 5, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            <Button asChild variant="outline" className="w-full mt-4 h-7 text-[10px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
-              <Link href="/dashboard/daily-logs">View All Logs</Link>
-            </Button>
           </CardContent>
         </Card>
 
-        {canAccessFinance(user) && (
-          <Card className="shadow-sm border-slate-200/60">
-            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
-                <DollarSign className="h-3.5 w-3.5 text-slate-500 opacity-70" />
-                Financial Summary
-              </CardTitle>
-              <CardDescription className="text-[9px] font-medium text-slate-400">Current month</CardDescription>
-            </CardHeader>
-            <CardContent className="p-3">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Income</span>
-                      <span className="font-bold text-[11px] text-green-600">{formatINR(monthlyIncome)}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
-                      <div className="bg-green-600 h-full rounded-full" style={{ width: "100%" }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Expenses</span>
-                      <span className="font-bold text-[11px] text-red-600">{formatINR(monthlyExpenses)}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
-                      <div
-                        className="bg-red-600 h-full rounded-full"
-                        style={{
-                          width: `${monthlyIncome > 0 ? Math.min((monthlyExpenses / monthlyIncome) * 100, 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-end">
-                  <div className="space-y-0">
-                    <span className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Net Balance</span>
-                    <p className={`font-black text-xl tracking-tight leading-tight ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {formatINR(monthlyBalance)}
-                    </p>
-                  </div>
-                </div>
+        <Card className="col-span-3 shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Activity Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center pt-6 p-4">
+            <div className="relative h-[160px] w-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={progressData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={5}
+                    dataKey="value"
+                    startAngle={90}
+                    endAngle={-270}
+                  >
+                    <Cell fill="#10b981" strokeWidth={0} />
+                    <Cell fill="#f1f5f9" strokeWidth={0} />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-3xl font-black text-slate-900 tracking-tighter">{logsToday}</span>
+                <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest">OF {totalActiveHouses} LOGS</span>
               </div>
-              <Button asChild variant="outline" className="w-full mt-4 h-7 text-[10px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
-                <Link href="/dashboard/finance">View Finances</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tight">Daily Log Completion</p>
+              <p className="text-[9px] text-slate-500 font-medium">Record all active houses by EOD</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Feed Consumption vs. Cumulative Mortality %</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={feedVsGrowthData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }} dy={10} />
+                <YAxis
+                  yAxisId="left"
+                  orientation="left"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }}
+                />
+                <Tooltip
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "10px", fontWeight: "bold" }}
+                />
+                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                <Bar yAxisId="left" dataKey="feedBags" name="Feed Bags" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="mortalityPercent"
+                  name="Mortality %"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: "#ef4444" }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-sm border-slate-200/60">
         <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
