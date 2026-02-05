@@ -439,11 +439,11 @@ export default function DailyLogsPage() {
       styles: { fontSize: 9, cellPadding: 3 },
       columnStyles: {
         0: { cellWidth: 25, halign: 'center' },
-        1: { cellWidth: 'auto' },
+        1: { cellWidth: 'auto', halign: 'center' },
         2: { cellWidth: 20, halign: 'center' },
         3: { cellWidth: 25, halign: 'center' },
-        4: { cellWidth: 35 },
-        5: { cellWidth: 25, halign: 'center' } // Center Aligned Closing
+        4: { cellWidth: 35, halign: 'center' },
+        5: { cellWidth: 25, halign: 'center' }
       }
     })
 
