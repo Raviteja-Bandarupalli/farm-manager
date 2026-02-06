@@ -55,13 +55,13 @@ export default function RootLayout({
               <BatchProvider>
                 <BatchSectionsProvider>
                   <WeeklyFeedProvider>
-                    <DailyLogsProvider>
-                      <InventoryProvider>
+                    <InventoryProvider>
+                      <DailyLogsProvider>
                         <BatchCostingProvider>
                           <FinanceProvider>{children}</FinanceProvider>
                         </BatchCostingProvider>
-                      </InventoryProvider>
-                    </DailyLogsProvider>
+                      </DailyLogsProvider>
+                    </InventoryProvider>
                   </WeeklyFeedProvider>
                 </BatchSectionsProvider>
               </BatchProvider>

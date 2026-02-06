@@ -117,8 +117,36 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
   const row = (o: object) => ({ ...o, id: Date.now().toString(), createdAt: new Date().toISOString() })
 
   const addFarm = async (farm: Omit<Farm, "id" | "createdAt">) => {
-    const { error } = await supabase.from("farms").insert(row(farm))
+    const farmId = Date.now().toString()
+    const { error } = await supabase.from("farms").insert({ ...farm, id: farmId, createdAt: new Date().toISOString() })
     if (error) throw error
+
+    // Auto-initialize core inventory items for the new farm
+    const coreItems = [
+      { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
+      { code: "SOYA", name: "Soya", category: "feed-raw", unit: "kg" },
+      { code: "BROKENRICE", name: "Broken Rice (Nukalu)", category: "feed-raw", unit: "kg" },
+      { code: "SUPPL-5", name: "5% Supplement", category: "feed-raw", unit: "kg" },
+    ]
+
+    for (const core of coreItems) {
+      const row = {
+        id: `item-${core.code}-${farmId}-${Date.now()}`,
+        farmId,
+        code: core.code,
+        name: core.name,
+        category: core.category,
+        unit: core.unit,
+        openingStock: 0,
+        openingValue: 0,
+        currentStock: 0,
+        averageCost: 0,
+        reorderLevel: 500,
+        createdAt: new Date().toISOString()
+      }
+      await supabase.from("inventory").insert(row)
+    }
+
     await fetchAll()
   }
   const updateFarm = async (id: string, farm: Partial<Farm>) => {

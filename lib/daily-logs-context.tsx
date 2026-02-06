@@ -7,6 +7,8 @@ import { logFetchError } from "@/lib/supabase-errors"
 import { useAuth } from "./auth-context"
 import { useBatch } from "./batch-context"
 import { useWeeklyFeed } from "./weekly-feed-context"
+import { useInventory } from "./inventory-context"
+import { useMasterData } from "./master-data-context"
 
 export interface DailyLog {
   id: string
@@ -19,6 +21,13 @@ export interface DailyLog {
   mortality: number
   closingBirds: number
   feedTypeId: string
+  // Mixing fields
+  maize_kg: number
+  soya_kg: number
+  brokenrice_kg: number
+  suppl5_kg: number
+  total_feed_mixed: number
+
   cumulativeMortality: number
   cumulativeFeed: number
   cumulativeMortalityPercent: number
@@ -76,9 +85,16 @@ function recalculateBatchLogs(
     const openingBirds = i === 0 ? initialBirds : out[i - 1].closingBirds
     const closingBirds = openingBirds - cur.mortality
     const cumulativeMortality = i === 0 ? cur.mortality : out[i - 1].cumulativeMortality + cur.mortality
-    const cumulativeFeed = weeklyFeeds
+    // Calculate cumulative feed using both old weekly feeds and new daily mix
+    const weeklyFeedSum = weeklyFeeds
       .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
-      .reduce((s, f) => s + f.totalFeedKg, 0)
+      .reduce((s, f) => s + Number(f.totalFeedKg), 0)
+
+    const dailyMixSum = batchLogs
+      .slice(0, i + 1)
+      .reduce((s, l) => s + Number(l.total_feed_mixed || 0), 0)
+
+    const cumulativeFeed = dailyMixSum > 0 ? dailyMixSum : weeklyFeedSum
     const cumulativeMortalityPercent = initialBirds > 0 ? (cumulativeMortality / initialBirds) * 100 : 0
     out.push({
       ...cur,
@@ -98,6 +114,8 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const { batches } = useBatch()
   const { weeklyFeeds } = useWeeklyFeed()
+  const { items, getItemByCodeAndFarm, refetch: refetchInventory } = useInventory()
+  const { houses } = useMasterData()
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -195,6 +213,11 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       mortality: Number(saved.mortality),
       closingBirds: Number(saved.closingBirds),
       feedTypeId: saved.feedTypeId ? String(saved.feedTypeId) : null,
+      maize_kg: Number(saved.maize_kg || 0),
+      soya_kg: Number(saved.soya_kg || 0),
+      brokenrice_kg: Number(saved.brokenrice_kg || 0),
+      suppl5_kg: Number(saved.suppl5_kg || 0),
+      total_feed_mixed: Number(saved.total_feed_mixed || 0),
       cumulativeMortality: Number(saved.cumulativeMortality),
       cumulativeFeed: Number(saved.cumulativeFeed),
       cumulativeMortalityPercent: Number(saved.cumulativeMortalityPercent),
@@ -234,6 +257,11 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       mortality: Number(row.mortality),
       closingBirds: Number(row.closingBirds),
       feedTypeId: row.feedTypeId ? String(row.feedTypeId) : null,
+      maize_kg: Number(row.maize_kg || 0),
+      soya_kg: Number(row.soya_kg || 0),
+      brokenrice_kg: Number(row.brokenrice_kg || 0),
+      suppl5_kg: Number(row.suppl5_kg || 0),
+      total_feed_mixed: Number(row.total_feed_mixed || 0),
       cumulativeMortality: Number(row.cumulativeMortality),
       cumulativeFeed: Number(row.cumulativeFeed),
       cumulativeMortalityPercent: Number(row.cumulativeMortalityPercent),
@@ -260,6 +288,31 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       throw error
     }
     console.log("[DailyLogs] Successfully inserted:", data)
+    // Deduct from inventory
+    if (insertPayload.total_feed_mixed > 0) {
+      const house = houses.find(h => h.id === insertPayload.houseId)
+      const farmId = house?.farmId || null
+
+      const deductions = [
+        { code: "MAIZE", qty: insertPayload.maize_kg },
+        { code: "SOYA", qty: insertPayload.soya_kg },
+        { code: "BROKENRICE", qty: insertPayload.brokenrice_kg },
+        { code: "SUPPL-5", qty: insertPayload.suppl5_kg },
+      ]
+
+      for (const ded of deductions) {
+        if (ded.qty > 0) {
+          const item = getItemByCodeAndFarm(ded.code, farmId)
+          if (item) {
+            await supabase.from("inventory").update({
+              currentStock: Math.max(0, Number(item.currentStock) - Number(ded.qty))
+            }).eq("id", item.id)
+          }
+        }
+      }
+      await refetchInventory()
+    }
+
     await fetchLogs()
     return saved
   }
@@ -278,6 +331,38 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
     )
     const final = recalc.find((l) => l.id === id)!
+
+    // Handle inventory adjustments if mixing quantities changed
+    if (prev.total_feed_mixed !== final.total_feed_mixed ||
+        prev.maize_kg !== final.maize_kg ||
+        prev.soya_kg !== final.soya_kg ||
+        prev.brokenrice_kg !== final.brokenrice_kg ||
+        prev.suppl5_kg !== final.suppl5_kg) {
+
+      const house = houses.find(h => h.id === final.houseId)
+      const farmId = house?.farmId || null
+
+      const ingredients = [
+        { code: "MAIZE", prev: prev.maize_kg, next: final.maize_kg },
+        { code: "SOYA", prev: prev.soya_kg, next: final.soya_kg },
+        { code: "BROKENRICE", prev: prev.brokenrice_kg, next: final.brokenrice_kg },
+        { code: "SUPPL-5", prev: prev.suppl5_kg, next: final.suppl5_kg },
+      ]
+
+      for (const ing of ingredients) {
+        const diff = Number(ing.next || 0) - Number(ing.prev || 0)
+        if (diff !== 0) {
+          const item = getItemByCodeAndFarm(ing.code, farmId)
+          if (item) {
+            await supabase.from("inventory").update({
+              currentStock: Math.max(0, Number(item.currentStock) - diff)
+            }).eq("id", item.id)
+          }
+        }
+      }
+      await refetchInventory()
+    }
+
     const row = { ...final, sectionMortality: final.sectionMortality ? JSON.stringify(final.sectionMortality) : null }
     const { error } = await supabase.from("daily_logs").update(row).eq("id", id)
     if (error) throw error
@@ -288,6 +373,32 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     if (user?.role !== "owner") throw new Error("Only owners can delete daily logs")
     const log = dailyLogs.find((l) => l.id === id)
     if (!log) return
+
+    // Restore inventory if it was a mixing log
+    if (log.total_feed_mixed > 0) {
+      const house = houses.find(h => h.id === log.houseId)
+      const farmId = house?.farmId || null
+
+      const ingredients = [
+        { code: "MAIZE", qty: log.maize_kg },
+        { code: "SOYA", qty: log.soya_kg },
+        { code: "BROKENRICE", qty: log.brokenrice_kg },
+        { code: "SUPPL-5", qty: log.suppl5_kg },
+      ]
+
+      for (const ing of ingredients) {
+        if (ing.qty > 0) {
+          const item = getItemByCodeAndFarm(ing.code, farmId)
+          if (item) {
+            await supabase.from("inventory").update({
+              currentStock: Number(item.currentStock) + Number(ing.qty)
+            }).eq("id", item.id)
+          }
+        }
+      }
+      await refetchInventory()
+    }
+
     const { error } = await supabase.from("daily_logs").delete().eq("id", id)
     if (error) throw error
     const remaining = dailyLogs.filter((l) => l.id !== id)
