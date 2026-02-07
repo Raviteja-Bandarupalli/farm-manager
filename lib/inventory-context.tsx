@@ -86,7 +86,7 @@ interface InventoryContextType {
   addBulkPurchaseAndDispatch: (
     purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">,
     dispatches: { farmId: string | null; quantity: number }[]
-  ) => Promise<void>
+  ) => Promise<PurchaseEntry | null>
   updatePurchase: (id: string, purchase: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>) => Promise<void>
   deletePurchase: (id: string) => Promise<void>
   linkPurchaseToFinance: (purchaseId: string, financeTransactionId: string) => Promise<void>
@@ -210,61 +210,80 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const addBulkPurchaseAndDispatch = async (
     purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">,
     dispatches: { farmId: string | null; quantity: number }[]
-  ) => {
-    // 1. Record the total purchase in Main Godown first (or just record the financial part)
-    // Actually the requirement says "Enter total bill once, then list which farms got how many bags"
-    // We'll treat this as:
-    // a) Create one Purchase entry (for the total)
-    // b) Distribute the quantities to the respective farm inventory items
+  ): Promise<PurchaseEntry | null> => {
+    try {
+      const totalQty = dispatches.reduce((sum, d) => sum + d.quantity, 0)
+      const totalAmount = totalQty * purchase.unitRate
 
-    const totalQty = dispatches.reduce((sum, d) => sum + d.quantity, 0)
-    const totalAmount = totalQty * purchase.unitRate
-
-    // Create the purchase entry
-    const purchaseRow = {
-      id: Date.now().toString(),
-      ...purchase,
-      quantity: totalQty,
-      totalAmount,
-      createdAt: new Date().toISOString(),
-    }
-
-    const { data: savedPurchase, error: pError } = await supabase.from("purchases").insert(purchaseRow).select().single()
-    if (pError) throw pError
-
-    // Distribute to each farm
-    const targetItem = items.find(i => i.id === purchase.itemId)
-    if (!targetItem) throw new Error("Item not found")
-
-    for (const dispatch of dispatches) {
-      // Find the item for this farm
-      let farmItem = items.find(i => i.code === targetItem.code && i.farmId === dispatch.farmId)
-
-      if (!farmItem) {
-        // Create if doesn't exist (though they should be auto-created)
-        const newItemRow = {
-          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          farmId: dispatch.farmId,
-          code: targetItem.code,
-          name: targetItem.name,
-          category: targetItem.category,
-          unit: targetItem.unit,
-          openingStock: 0,
-          openingValue: 0,
-          currentStock: dispatch.quantity,
-          averageCost: purchase.unitRate,
-          reorderLevel: targetItem.reorderLevel,
-          createdAt: new Date().toISOString()
-        }
-        await supabase.from("inventory").insert(newItemRow)
-      } else {
-        const newStock = Number(farmItem.currentStock) + Number(dispatch.quantity)
-        const newAvg = newStock > 0 ? (Number(farmItem.currentStock) * Number(farmItem.averageCost) + (dispatch.quantity * purchase.unitRate)) / newStock : purchase.unitRate
-        await supabase.from("inventory").update({ currentStock: newStock, averageCost: newAvg }).eq("id", farmItem.id)
+      // Create the purchase entry
+      const purchaseRow = {
+        id: Date.now().toString(),
+        ...purchase,
+        quantity: totalQty,
+        totalAmount,
+        createdAt: new Date().toISOString(),
       }
-    }
 
-    await fetchInventory()
+      const { data: savedPurchase, error: pError } = await supabase.from("purchases").insert(purchaseRow).select().single()
+      if (pError) throw pError
+
+      // Distribute to each farm
+      const targetItem = items.find(i => i.id === purchase.itemId)
+      if (!targetItem) throw new Error("Ingredient not found in Item Master")
+
+      for (const dispatch of dispatches) {
+        // Find the item record for this specific farm
+        let farmItem = items.find(i => i.code === targetItem.code && i.farmId === dispatch.farmId)
+
+        if (!farmItem) {
+          // If the item doesn't exist for this farm, create it
+          const newItemRow = {
+            id: `item-${targetItem.code}-${dispatch.farmId || 'godown'}-${Date.now()}`,
+            farmId: dispatch.farmId,
+            code: targetItem.code,
+            name: targetItem.name,
+            category: targetItem.category,
+            unit: targetItem.unit,
+            openingStock: 0,
+            openingValue: 0,
+            currentStock: dispatch.quantity,
+            averageCost: purchase.unitRate,
+            reorderLevel: targetItem.reorderLevel,
+            createdAt: new Date().toISOString()
+          }
+          const { error: iError } = await supabase.from("inventory").insert(newItemRow)
+          if (iError) {
+            console.error(`Failed to create inventory for farm ${dispatch.farmId}:`, iError)
+            throw new Error(`Failed to initialize stock for one of the farms.`)
+          }
+        } else {
+          // Update existing stock
+          const currentStock = Number(farmItem.currentStock || 0)
+          const currentAvgCost = Number(farmItem.averageCost || 0)
+          const newStock = currentStock + dispatch.quantity
+
+          // Weighted average cost calculation
+          const newAvg = newStock > 0
+            ? (currentStock * currentAvgCost + dispatch.quantity * purchase.unitRate) / newStock
+            : purchase.unitRate
+
+          const { error: uError } = await supabase.from("inventory")
+            .update({ currentStock: newStock, averageCost: newAvg })
+            .eq("id", farmItem.id)
+
+          if (uError) {
+            console.error(`Failed to update inventory for farm ${dispatch.farmId}:`, uError)
+            throw new Error(`Failed to update stock for one of the farms.`)
+          }
+        }
+      }
+
+      await fetchInventory()
+      return savedPurchase as PurchaseEntry
+    } catch (err) {
+      console.error("Error in addBulkPurchaseAndDispatch:", err)
+      throw err
+    }
   }
 
   const linkPurchaseToFinance = async (purchaseId: string, financeTransactionId: string) => {

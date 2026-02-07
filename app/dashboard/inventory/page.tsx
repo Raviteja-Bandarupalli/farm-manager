@@ -120,6 +120,8 @@ export default function InventoryPage() {
     supplierId: "",
     itemId: "",
     unitRate: "",
+    totalKg: "",
+    totalBags: "",
     invoiceNumber: "",
     dispatches: [] as { farmId: string | null; quantity: string; bags: string; manualOverride: boolean }[]
   })
@@ -281,6 +283,8 @@ export default function InventoryPage() {
       supplierId: "",
       itemId: "",
       unitRate: "",
+      totalKg: "",
+      totalBags: "",
       invoiceNumber: "",
       dispatches: [
         { farmId: null, quantity: "", bags: "", manualOverride: false },
@@ -292,37 +296,45 @@ export default function InventoryPage() {
 
   const handleBulkPurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const activeDispatches = bulkPurchaseForm.dispatches
+      .filter(d => Number(d.quantity) > 0)
+      .map(d => ({
+        farmId: d.farmId,
+        quantity: Number(d.quantity)
+      }))
+
+    const totalDispatchedKg = activeDispatches.reduce((sum, d) => sum + d.quantity, 0)
+    const lorryTotalKg = Number(bulkPurchaseForm.totalKg || 0)
+
+    if (activeDispatches.length === 0) {
+      alert("Please enter quantities for at least one location.")
+      return
+    }
+
+    if (Math.abs(totalDispatchedKg - lorryTotalKg) > 0.01) {
+      alert(`The sum of dispatches (${totalDispatchedKg.toLocaleString()} KG) must match the Total Lorry Load (${lorryTotalKg.toLocaleString()} KG).`)
+      return
+    }
+
     try {
-      const activeDispatches = bulkPurchaseForm.dispatches
-        .filter(d => Number(d.quantity) > 0)
-        .map(d => ({
-          farmId: d.farmId,
-          quantity: Number(d.quantity)
-        }))
-
-      if (activeDispatches.length === 0) {
-        alert("Please enter quantities for at least one location.")
-        return
-      }
-
-      await addBulkPurchaseAndDispatch({
+      const savedPurchase = await addBulkPurchaseAndDispatch({
         date: bulkPurchaseForm.date,
         supplierId: bulkPurchaseForm.supplierId,
         itemId: bulkPurchaseForm.itemId,
         unitRate: Number(bulkPurchaseForm.unitRate),
         invoiceNumber: bulkPurchaseForm.invoiceNumber,
-        quantity: 0,
+        quantity: lorryTotalKg,
       }, activeDispatches)
 
       // Record financial expense
-      const totalQty = activeDispatches.reduce((sum, d) => sum + d.quantity, 0)
-      const totalAmount = totalQty * Number(bulkPurchaseForm.unitRate)
+      const totalAmount = lorryTotalKg * Number(bulkPurchaseForm.unitRate)
       const item = getItemById(bulkPurchaseForm.itemId)
 
-      const desc = item ? `${item.code} Bulk Purchase ${totalQty.toFixed(0)}${item.unit}` : `Bulk Purchase ${totalQty.toFixed(0)} units`
+      const desc = item ? `${item.code} Lorry: ${lorryTotalKg.toLocaleString()} KG` : `Lorry: ${lorryTotalKg.toLocaleString()} KG`
       const ref = bulkPurchaseForm.invoiceNumber ? ` INV-${bulkPurchaseForm.invoiceNumber}` : ""
 
-      await addTransaction({
+      const tx = await addTransaction({
         type: "expense",
         category: "Feed Purchase",
         amount: totalAmount,
@@ -331,10 +343,14 @@ export default function InventoryPage() {
         reference: bulkPurchaseForm.invoiceNumber || "",
       })
 
+      if (tx && savedPurchase) {
+        await linkPurchaseToFinance(savedPurchase.id, tx.id)
+      }
+
       setIsBulkPurchaseDialogOpen(false)
     } catch (err) {
       console.error("Bulk purchase failed:", err)
-      alert("Failed to save bulk purchase.")
+      alert(err instanceof Error ? err.message : "Failed to save bulk purchase.")
     }
   }
 
@@ -451,30 +467,34 @@ export default function InventoryPage() {
                     Purchase & Dispatch
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Bulk Purchase & Dispatch</DialogTitle>
-                    <DialogDescription>Record a bulk arrival and split it across farms</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleBulkPurchaseSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Date</label>
-                        <Input
-                          type="date"
-                          value={bulkPurchaseForm.date}
-                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, date: e.target.value })}
-                          required
-                        />
+                <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl">
+                  <div className="bg-slate-900 text-white p-6 rounded-t-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-2xl font-black tracking-tight flex items-center gap-2 uppercase">
+                          <ShoppingCart className="h-6 w-6" />
+                          Lorry Delivery Challan
+                        </h2>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Bulk Ingredient Purchase & Dispatch</p>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Supplier</label>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase text-slate-500">Date</p>
+                        <p className="font-bold">{formatIndianDate(bulkPurchaseForm.date)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-8 bg-white rounded-b-lg">
+                    {/* Header Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-500">Supplier</label>
                         <Select
                           value={bulkPurchaseForm.supplierId}
                           onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
                           required
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10 bg-white">
                             <SelectValue placeholder="Select supplier" />
                           </SelectTrigger>
                           <SelectContent>
@@ -484,17 +504,14 @@ export default function InventoryPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Ingredient</label>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-500">Ingredient</label>
                         <Select
                           value={bulkPurchaseForm.itemId}
                           onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, itemId: v })}
                           required
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10 bg-white">
                             <SelectValue placeholder="Select item" />
                           </SelectTrigger>
                           <SelectContent>
@@ -506,102 +523,200 @@ export default function InventoryPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Unit Rate (₹/KG)</label>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-500">Unit Rate (₹/KG)</label>
                         <Input
                           type="number"
                           step="0.01"
+                          className="h-10 bg-white font-bold"
                           value={bulkPurchaseForm.unitRate}
                           onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, unitRate: e.target.value })}
                           required
                         />
                       </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="font-bold border-b pb-2">Dispatch Split</h3>
-                      <div className="space-y-3">
-                        {bulkPurchaseForm.dispatches.map((dispatch, idx) => {
-                          const farm = farms.find(f => f.id === dispatch.farmId)
-                          const label = dispatch.farmId === null ? "Main Godown" : farm?.name || "Unknown"
-
-                          return (
-                            <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-slate-50 p-2 rounded">
-                              <div className="col-span-4 text-sm font-bold">{label}</div>
-                              <div className="col-span-3 space-y-1">
-                                <label className="text-[10px] uppercase text-slate-500">Bags (50kg)</label>
-                                <Input
-                                  type="number"
-                                  placeholder="0"
-                                  value={dispatch.bags}
-                                  onChange={(e) => {
-                                    const bags = e.target.value
-                                    const qty = Number(bags) * 50
-                                    const newDispatches = [...bulkPurchaseForm.dispatches]
-                                    newDispatches[idx] = {
-                                      ...dispatch,
-                                      bags,
-                                      quantity: dispatch.manualOverride ? dispatch.quantity : String(qty)
-                                    }
-                                    setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
-                                  }}
-                                />
-                              </div>
-                              <div className="col-span-4 space-y-1">
-                                <label className="text-[10px] uppercase text-slate-500">Exact KG</label>
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  placeholder="0.0"
-                                  value={dispatch.quantity}
-                                  onChange={(e) => {
-                                    const qty = e.target.value
-                                    const newDispatches = [...bulkPurchaseForm.dispatches]
-                                    newDispatches[idx] = {
-                                      ...dispatch,
-                                      quantity: qty,
-                                      manualOverride: true
-                                    }
-                                    setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
-                                  }}
-                                />
-                              </div>
-                              <div className="col-span-1 flex justify-center">
-                                {dispatch.manualOverride && (
-                                  <Badge variant="outline" className="text-[8px] bg-amber-50">MANUAL</Badge>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-500">Invoice / Lorry #</label>
+                        <Input
+                          className="h-10 bg-white font-mono"
+                          value={bulkPurchaseForm.invoiceNumber}
+                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, invoiceNumber: e.target.value })}
+                          placeholder="INV-..."
+                        />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Invoice Number</label>
-                      <Input
-                        value={bulkPurchaseForm.invoiceNumber}
-                        onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, invoiceNumber: e.target.value })}
-                        placeholder="e.g., LORRY-1234"
-                      />
+                    {/* Total Lorry Load Section */}
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-1">1. Lorry Total Load</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-600">Total KG in Bill *</label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            className="h-12 text-xl font-black border-2 border-slate-900"
+                            value={bulkPurchaseForm.totalKg}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-600">Total Bags in Bill</label>
+                          <Input
+                            type="number"
+                            className="h-12 text-xl font-black border-2 border-slate-900"
+                            value={bulkPurchaseForm.totalBags}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
+                          />
+                        </div>
+                        <div className="col-span-2 flex gap-4">
+                          <div className={`flex-1 p-2 rounded border-2 border-dashed ${
+                            Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) < 0.1
+                            ? 'bg-green-50 border-green-500 text-green-700'
+                            : 'bg-amber-50 border-amber-500 text-amber-700'
+                          }`}>
+                            <p className="text-[9px] font-black uppercase opacity-70">Remaining KG</p>
+                            <p className="text-lg font-black tracking-tighter">
+                              {(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)).toLocaleString()} KG
+                            </p>
+                          </div>
+                          <div className="flex-1 p-2 rounded border-2 border-dashed bg-slate-50 border-slate-200">
+                            <p className="text-[9px] font-black uppercase opacity-70">Remaining Bags</p>
+                            <p className="text-lg font-black tracking-tighter">
+                              {(Number(bulkPurchaseForm.totalBags || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.bags || 0), 0)).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="p-3 bg-slate-900 text-white rounded-lg flex justify-between items-center">
-                      <div>
-                        <p className="text-[10px] uppercase text-slate-400">Total Bill Amount</p>
-                        <p className="text-xl font-black">
-                          ₹{(bulkPurchaseForm.dispatches.reduce((sum, d) => sum + Number(d.quantity), 0) * Number(bulkPurchaseForm.unitRate)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] uppercase text-slate-400">Total Load</p>
-                        <p className="text-xl font-black">
-                          {bulkPurchaseForm.dispatches.reduce((sum, d) => sum + Number(d.quantity), 0).toLocaleString()} KG
-                        </p>
+                    {/* Dispatch Table */}
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-1">2. Farm Wise Dispatch</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 border-b">
+                            <tr>
+                              <th className="py-2 px-4 font-black uppercase text-[10px]">Location</th>
+                              <th className="py-2 px-4 font-black uppercase text-[10px] w-32">Bags</th>
+                              <th className="py-2 px-4 font-black uppercase text-[10px] w-48 text-right">Exact KG</th>
+                              <th className="py-2 px-4 w-12"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {bulkPurchaseForm.dispatches.map((dispatch, idx) => {
+                              const farm = farms.find(f => f.id === dispatch.farmId)
+                              const label = dispatch.farmId === null ? "Main Godown" : farm?.name || "Unknown"
+
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                  <td className="py-3 px-4 font-bold text-slate-700">{label}</td>
+                                  <td className="py-2 px-4">
+                                    <Input
+                                      type="number"
+                                      placeholder="0"
+                                      className="h-10 font-bold"
+                                      value={dispatch.bags}
+                                      onChange={(e) => {
+                                        const bags = e.target.value
+                                        const qty = Number(bags) * 50
+                                        const newDispatches = [...bulkPurchaseForm.dispatches]
+                                        newDispatches[idx] = {
+                                          ...dispatch,
+                                          bags,
+                                          quantity: dispatch.manualOverride ? dispatch.quantity : (bags ? String(qty) : "")
+                                        }
+                                        setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-4">
+                                    <div className="flex items-center gap-2 justify-end">
+                                      <Input
+                                        type="number"
+                                        step="0.1"
+                                        placeholder="0.0"
+                                        className={`h-10 w-32 font-black text-right ${dispatch.manualOverride ? 'border-amber-400 bg-amber-50' : ''}`}
+                                        value={dispatch.quantity}
+                                        onChange={(e) => {
+                                          const qty = e.target.value
+                                          const newDispatches = [...bulkPurchaseForm.dispatches]
+                                          newDispatches[idx] = {
+                                            ...dispatch,
+                                            quantity: qty,
+                                            manualOverride: true
+                                          }
+                                          setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
+                                        }}
+                                      />
+                                      <span className="text-[10px] font-bold text-slate-400">KG</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-4 text-center">
+                                    {dispatch.manualOverride && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-amber-600"
+                                        onClick={() => {
+                                          const newDispatches = [...bulkPurchaseForm.dispatches]
+                                          const autoQty = Number(dispatch.bags) * 50
+                                          newDispatches[idx] = {
+                                            ...dispatch,
+                                            quantity: String(autoQty),
+                                            manualOverride: false
+                                          }
+                                          setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
+                                        }}
+                                        title="Reset to 50kg per bag"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                          <tfoot className="bg-slate-900 text-white font-black">
+                            <tr>
+                              <td className="py-3 px-4 uppercase text-[10px]">Total Dispatched</td>
+                              <td className="py-3 px-4">{bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.bags || 0), 0)} Bags</td>
+                              <td className="py-3 px-4 text-right">
+                                {bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0).toLocaleString()} KG
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full h-12 text-lg font-bold">Record Bulk Purchase</Button>
+                    {/* Summary Footer */}
+                    <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900 text-white p-6 rounded-lg shadow-xl">
+                      <div className="flex gap-8">
+                        <div>
+                          <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Total Bill Amount</p>
+                          <p className="text-3xl font-black tracking-tight text-green-400">
+                            ₹{(Number(bulkPurchaseForm.totalKg || 0) * Number(bulkPurchaseForm.unitRate || 0)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="border-l border-slate-700 pl-8">
+                          <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Total Lorry Load</p>
+                          <p className="text-3xl font-black tracking-tight">
+                            {Number(bulkPurchaseForm.totalKg || 0).toLocaleString()} <span className="text-sm">KG</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        className="w-full md:w-64 h-16 text-lg font-black uppercase tracking-widest bg-white text-slate-900 hover:bg-slate-200"
+                        disabled={Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) > 0.01}
+                      >
+                        Record Bulk Purchase
+                      </Button>
+                    </div>
                   </form>
                 </DialogContent>
               </Dialog>
