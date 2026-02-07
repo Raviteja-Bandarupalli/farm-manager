@@ -119,10 +119,8 @@ export default function InventoryPage() {
     date: getTodayDate(),
     supplierId: "",
     itemId: "",
-    unitRate: "",
     totalKg: "",
     totalBags: "",
-    invoiceNumber: "",
     dispatches: [] as { farmId: string | null; quantity: string; bags: string; manualOverride: boolean }[]
   })
 
@@ -282,10 +280,8 @@ export default function InventoryPage() {
       date: getTodayDate(),
       supplierId: "",
       itemId: "",
-      unitRate: "",
       totalKg: "",
       totalBags: "",
-      invoiceNumber: "",
       dispatches: [
         { farmId: null, quantity: "", bags: "", manualOverride: false },
         ...farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
@@ -318,34 +314,14 @@ export default function InventoryPage() {
     }
 
     try {
-      const savedPurchase = await addBulkPurchaseAndDispatch({
+      await addBulkPurchaseAndDispatch({
         date: bulkPurchaseForm.date,
         supplierId: bulkPurchaseForm.supplierId,
         itemId: bulkPurchaseForm.itemId,
-        unitRate: Number(bulkPurchaseForm.unitRate),
-        invoiceNumber: bulkPurchaseForm.invoiceNumber,
+        unitRate: 0,
+        invoiceNumber: "CHALLAN",
         quantity: lorryTotalKg,
       }, activeDispatches)
-
-      // Record financial expense
-      const totalAmount = lorryTotalKg * Number(bulkPurchaseForm.unitRate)
-      const item = getItemById(bulkPurchaseForm.itemId)
-
-      const desc = item ? `${item.code} Lorry: ${lorryTotalKg.toLocaleString()} KG` : `Lorry: ${lorryTotalKg.toLocaleString()} KG`
-      const ref = bulkPurchaseForm.invoiceNumber ? ` INV-${bulkPurchaseForm.invoiceNumber}` : ""
-
-      const tx = await addTransaction({
-        type: "expense",
-        category: "Feed Purchase",
-        amount: totalAmount,
-        date: bulkPurchaseForm.date,
-        description: `${desc}${ref}`,
-        reference: bulkPurchaseForm.invoiceNumber || "",
-      })
-
-      if (tx && savedPurchase) {
-        await linkPurchaseToFinance(savedPurchase.id, tx.id)
-      }
 
       setIsBulkPurchaseDialogOpen(false)
     } catch (err) {
@@ -473,9 +449,9 @@ export default function InventoryPage() {
                       <div>
                         <h2 className="text-2xl font-black tracking-tight flex items-center gap-2 uppercase">
                           <ShoppingCart className="h-6 w-6" />
-                          Lorry Delivery Challan
+                          LORRY DELIVERY CHALLAN
                         </h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Bulk Ingredient Purchase & Dispatch</p>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Weight Tracking & Distribution</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-black uppercase text-slate-500">Date</p>
@@ -486,7 +462,7 @@ export default function InventoryPage() {
 
                   <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-8 bg-white rounded-b-lg">
                     {/* Header Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-slate-500">Supplier</label>
                         <Select
@@ -522,26 +498,6 @@ export default function InventoryPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-500">Unit Rate (₹/KG)</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          className="h-10 bg-white font-bold"
-                          value={bulkPurchaseForm.unitRate}
-                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, unitRate: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-500">Invoice / Lorry #</label>
-                        <Input
-                          className="h-10 bg-white font-mono"
-                          value={bulkPurchaseForm.invoiceNumber}
-                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, invoiceNumber: e.target.value })}
-                          placeholder="INV-..."
-                        />
                       </div>
                     </div>
 
@@ -696,15 +652,17 @@ export default function InventoryPage() {
                     <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900 text-white p-6 rounded-lg shadow-xl">
                       <div className="flex gap-8">
                         <div>
-                          <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Total Bill Amount</p>
-                          <p className="text-3xl font-black tracking-tight text-green-400">
-                            ₹{(Number(bulkPurchaseForm.totalKg || 0) * Number(bulkPurchaseForm.unitRate || 0)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                        <div className="border-l border-slate-700 pl-8">
                           <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Total Lorry Load</p>
                           <p className="text-3xl font-black tracking-tight">
                             {Number(bulkPurchaseForm.totalKg || 0).toLocaleString()} <span className="text-sm">KG</span>
+                          </p>
+                        </div>
+                        <div className="border-l border-slate-700 pl-8">
+                          <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Status</p>
+                          <p className={`text-xl font-black tracking-tight ${Math.abs(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) < 0.1 ? 'text-green-400' : 'text-amber-400'}`}>
+                            {Math.abs(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) < 0.1
+                              ? 'READY TO RECORD'
+                              : `NEED ${Math.abs(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)).toLocaleString()} KG MORE`}
                           </p>
                         </div>
                       </div>
@@ -714,7 +672,7 @@ export default function InventoryPage() {
                         className="w-full md:w-64 h-16 text-lg font-black uppercase tracking-widest bg-white text-slate-900 hover:bg-slate-200"
                         disabled={Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) > 0.01}
                       >
-                        Record Bulk Purchase
+                        Record Challan
                       </Button>
                     </div>
                   </form>
