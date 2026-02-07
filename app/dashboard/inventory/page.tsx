@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry, type StockTransfer, CORE_INGREDIENTS } from "@/lib/inventory-context"
 import { useDailyLogs } from "@/lib/daily-logs-context"
-import { formatIndianDate } from "@/lib/utils"
+import { formatIndianDate, cn } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1155,8 +1155,8 @@ export default function InventoryPage() {
                     <TableBody>
                       {transfers.map(t => {
                         const item = items.find(i => i.id === t.itemId)
-                        const from = t.sourceFarmId === null ? "Main Godown" : farms.find(f => f.id === t.sourceFarmId)?.name || "Unknown"
-                        const to = t.destinationFarmId === null ? "Main Godown" : farms.find(f => f.id === t.destinationFarmId)?.name || "Unknown"
+                        const from = farms.find(f => f.id === t.sourceFarmId)?.name || "Unknown"
+                        const to = farms.find(f => f.id === t.destinationFarmId)?.name || "Unknown"
 
                         return (
                           <TableRow key={t.id}>
@@ -1230,6 +1230,8 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
       </Tabs>
+        </div>
+      </div>
 
       {/* Add Custom Item Dialog */}
       <Dialog open={isItemDialogOpen} onOpenChange={(open) => {
