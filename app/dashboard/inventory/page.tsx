@@ -6,7 +6,7 @@ import { useMasterData } from "@/lib/master-data-context"
 import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
-import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry, type StockTransfer } from "@/lib/inventory-context"
+import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry, type StockTransfer, CORE_INGREDIENTS } from "@/lib/inventory-context"
 import { useDailyLogs } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
@@ -87,7 +87,7 @@ export default function InventoryPage() {
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null)
 
   const [itemForm, setItemForm] = useState({
-    farmId: "" as string | null,
+    farmId: "" as string,
     code: "",
     name: "",
     category: "feed-raw" as any,
@@ -117,10 +117,10 @@ export default function InventoryPage() {
   const [bulkPurchaseForm, setBulkPurchaseForm] = useState({
     date: getTodayDate(),
     supplierId: "",
-    itemId: "",
+    ingredientCode: "",
     totalKg: "",
     totalBags: "",
-    dispatches: [] as { farmId: string | null; quantity: string; bags: string; manualOverride: boolean }[]
+    dispatches: [] as { farmId: string; quantity: string; bags: string; manualOverride: boolean }[]
   })
 
   const handleDispatchChange = (index: number, field: string, value: string) => {
@@ -146,8 +146,8 @@ export default function InventoryPage() {
   const [transferForm, setTransferForm] = useState({
     date: getTodayDate(),
     itemId: "", // Source item ID
-    sourceFarmId: "" as string | null,
-    destinationFarmId: "" as string | null,
+    sourceFarmId: "",
+    destinationFarmId: "",
     quantity: "",
     driverNotes: ""
   })
@@ -165,7 +165,7 @@ export default function InventoryPage() {
         })
       } else {
         await addItem({
-          farmId: itemForm.farmId === "null" ? null : itemForm.farmId,
+          farmId: itemForm.farmId,
           code: itemForm.code,
           name: itemForm.name,
           category: itemForm.category,
@@ -185,7 +185,7 @@ export default function InventoryPage() {
 
   const resetItemForm = () => {
     setItemForm({
-      farmId: null,
+      farmId: "",
       code: "",
       name: "",
       category: "feed-raw",
@@ -298,16 +298,22 @@ export default function InventoryPage() {
     setBulkPurchaseForm({
       date: getTodayDate(),
       supplierId: "",
-      itemId: "",
+      ingredientCode: "",
       totalKg: "",
       totalBags: "",
-      dispatches: [
-        { farmId: null, quantity: "", bags: "", manualOverride: false },
-        ...farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
-      ]
+      dispatches: farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
     })
     setIsBulkPurchaseDialogOpen(true)
   }
+
+  useEffect(() => {
+    if (isBulkPurchaseDialogOpen && bulkPurchaseForm.dispatches.length === 0 && farms.length > 0) {
+      setBulkPurchaseForm(prev => ({
+        ...prev,
+        dispatches: farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
+      }))
+    }
+  }, [isBulkPurchaseDialogOpen, farms, bulkPurchaseForm.dispatches.length])
 
   const handleBulkPurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -336,7 +342,7 @@ export default function InventoryPage() {
       await addBulkPurchaseAndDispatch({
         date: bulkPurchaseForm.date,
         supplierId: bulkPurchaseForm.supplierId,
-        itemId: bulkPurchaseForm.itemId,
+        ingredientCode: bulkPurchaseForm.ingredientCode,
         unitRate: 0,
         invoiceNumber: "CHALLAN-" + Date.now().toString().slice(-6),
         quantity: lorryTotalKg,
@@ -345,7 +351,7 @@ export default function InventoryPage() {
       setBulkPurchaseForm({
         date: getTodayDate(),
         supplierId: "",
-        itemId: "",
+        ingredientCode: "",
         totalKg: "",
         totalBags: "",
         dispatches: []
@@ -437,12 +443,10 @@ export default function InventoryPage() {
     ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].every(code =>
       items.some(item => item.code === code && item.farmId === farm.id)
     )
-  ) && ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].every(code =>
-    items.some(item => item.code === code && item.farmId === null)
   )
 
   const handleInitializeCore = async () => {
-    if (confirm("This will initialize core inventory items (Maize, Soya, Broken Rice, 5% Supplement) for all farms and the Main Godown. Continue?")) {
+    if (confirm("This will initialize core inventory items (Maize, Soya, Broken Rice, 5% Supplement) for all farms. Continue?")) {
       try {
         await initializeCoreItems(farms)
         alert("Inventory initialization complete!")
@@ -510,23 +514,20 @@ export default function InventoryPage() {
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-slate-500">Ingredient</label>
                         <Select
-                          value={bulkPurchaseForm.itemId}
+                          value={bulkPurchaseForm.ingredientCode}
                           onValueChange={(v) => {
-                            const initialDispatches = [
-                              { farmId: null, quantity: "", bags: "", manualOverride: false },
-                              ...farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
-                            ]
-                            setBulkPurchaseForm({ ...bulkPurchaseForm, itemId: v, dispatches: initialDispatches })
+                            const initialDispatches = farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
+                            setBulkPurchaseForm({ ...bulkPurchaseForm, ingredientCode: v, dispatches: initialDispatches })
                           }}
                           required
                         >
                           <SelectTrigger className="h-10 bg-white">
-                            <SelectValue placeholder="Select item" />
+                            <SelectValue placeholder="Select ingredient" />
                           </SelectTrigger>
                           <SelectContent>
-                            {items.filter(i => i.farmId === null).map((item) => (
-                              <SelectItem key={item.id} value={item.id}>
-                                {item.code} - {item.name}
+                            {CORE_INGREDIENTS.map((core) => (
+                              <SelectItem key={core.code} value={core.code}>
+                                {core.code} - {core.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -595,7 +596,7 @@ export default function InventoryPage() {
                           <tbody className="divide-y">
                             {bulkPurchaseForm.dispatches.map((dispatch, idx) => {
                               const farm = farms.find(f => f.id === dispatch.farmId)
-                              const label = dispatch.farmId === null ? "Main Godown" : farm?.name || "Unknown"
+                              const label = farm?.name || "Unknown"
 
                               return (
                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
@@ -719,15 +720,14 @@ export default function InventoryPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Source Location</label>
                       <Select
-                        value={transferForm.sourceFarmId === null ? "null" : transferForm.sourceFarmId || ""}
-                        onValueChange={(v) => setTransferForm({ ...transferForm, sourceFarmId: v === "null" ? null : v, itemId: "" })}
+                        value={transferForm.sourceFarmId || ""}
+                        onValueChange={(v) => setTransferForm({ ...transferForm, sourceFarmId: v, itemId: "" })}
                         required
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select source" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="null">Main Godown</SelectItem>
                           {farms.map(f => (
                             <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                           ))}
@@ -758,15 +758,14 @@ export default function InventoryPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Destination Location</label>
                       <Select
-                        value={transferForm.destinationFarmId === null ? "null" : transferForm.destinationFarmId || ""}
-                        onValueChange={(v) => setTransferForm({ ...transferForm, destinationFarmId: v === "null" ? null : v })}
+                        value={transferForm.destinationFarmId || ""}
+                        onValueChange={(v) => setTransferForm({ ...transferForm, destinationFarmId: v })}
                         required
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select destination" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="null">Main Godown</SelectItem>
                           {farms.map(f => (
                             <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                           ))}
@@ -823,17 +822,14 @@ export default function InventoryPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[null, ...farms].filter(farm => {
-          const farmId = farm?.id || null
-          const farmHouses = houses.filter(h => h.farmId === farmId)
-          const farmHouseIds = farmHouses.map(h => h.id)
-          const hasActiveBatch = batches.some(b => farmHouseIds.includes(b.houseId) && b.status === "active")
+        {farms.filter(farm => {
+          const farmId = farm.id
           const hasStock = items.some(i => i.farmId === farmId && Number(i.currentStock) > 0)
-          return hasActiveBatch || hasStock || farmId === null // Always show Main Godown
+          return hasStock
         }).map((farm, idx) => {
-          const farmId = farm?.id || null
-          const locationName = farm?.name || "Main Godown"
-          const locationStock = items.filter(i => i.farmId === farmId && ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].includes(i.code))
+          const farmId = farm.id
+          const locationName = farm.name
+          const locationStock = items.filter(i => i.farmId === farmId && ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].includes(i.code) && Number(i.currentStock) > 0)
 
           return (
             <Card key={idx} className="border-t-4 border-t-slate-800 shadow-md">
@@ -928,14 +924,14 @@ export default function InventoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[null, ...farms.map(f => f.id)].map(locationId => {
-                        const locationItems = items.filter(i => i.farmId === locationId)
+                      {farms.map(f => f.id).map(locationId => {
+                        const locationItems = items.filter(i => i.farmId === locationId && Number(i.currentStock) > 0)
                         if (locationItems.length === 0) return null
 
-                        const locationName = locationId === null ? "Main Godown (Central Storage)" : farms.find(f => f.id === locationId)?.name
+                        const locationName = farms.find(f => f.id === locationId)?.name
 
                         return (
-                          <React.Fragment key={locationId || 'godown'}>
+                          <React.Fragment key={locationId}>
                             <TableRow className="bg-slate-100/50 hover:bg-slate-100/50 border-y-2 border-slate-200">
                               <TableCell colSpan={6} className="py-1 px-4">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">{locationName}</span>
@@ -1151,15 +1147,14 @@ export default function InventoryPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Location</label>
               <Select
-                value={itemForm.farmId === null ? "null" : itemForm.farmId || ""}
-                onValueChange={(v) => setItemForm({ ...itemForm, farmId: v === "null" ? null : v })}
+                value={itemForm.farmId || ""}
+                onValueChange={(v) => setItemForm({ ...itemForm, farmId: v })}
                 disabled={!!editingItemId}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="null">Main Godown</SelectItem>
                   {farms.map(f => (
                     <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                   ))}

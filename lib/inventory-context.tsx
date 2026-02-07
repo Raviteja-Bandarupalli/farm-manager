@@ -5,9 +5,16 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
 
+export const CORE_INGREDIENTS = [
+  { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
+  { code: "SOYA", name: "Soya", category: "feed-raw", unit: "kg" },
+  { code: "BROKENRICE", name: "Broken Rice (Nukalu)", category: "feed-raw", unit: "kg" },
+  { code: "SUPPL-5", name: "5% Supplement", category: "feed-raw", unit: "kg" },
+] as const
+
 export interface InventoryItem {
   id: string
-  farmId: string | null // NULL means Main Godown
+  farmId: string
   code: string
   name: string
   category: "feed-raw" | "feed-finished" | "medicine" | "vaccine" | "litter" | "utilities" | "other"
@@ -49,8 +56,8 @@ export interface StockTransfer {
   id: string
   date: string
   itemId: string
-  sourceFarmId: string | null
-  destinationFarmId: string | null
+  sourceFarmId: string
+  destinationFarmId: string
   quantity: number
   driverNotes: string
   createdAt: string
@@ -84,8 +91,8 @@ interface InventoryContextType {
   deleteItem: (id: string) => Promise<void>
   addPurchase: (purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">) => Promise<PurchaseEntry | null>
   addBulkPurchaseAndDispatch: (
-    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">,
-    dispatches: { farmId: string | null; quantity: number }[]
+    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId" | "itemId"> & { ingredientCode: string },
+    dispatches: { farmId: string; quantity: number }[]
   ) => Promise<PurchaseEntry | null>
   updatePurchase: (id: string, purchase: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>) => Promise<void>
   deletePurchase: (id: string) => Promise<void>
@@ -208,75 +215,69 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addBulkPurchaseAndDispatch = async (
-    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">,
-    dispatches: { farmId: string | null; quantity: number }[]
+    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId" | "itemId"> & { ingredientCode: string },
+    dispatches: { farmId: string; quantity: number }[]
   ): Promise<PurchaseEntry | null> => {
     try {
       const totalQty = dispatches.reduce((sum, d) => sum + d.quantity, 0)
       const totalAmount = totalQty * purchase.unitRate
 
-      // Create the purchase entry
+      const coreIngredient = CORE_INGREDIENTS.find(c => c.code === purchase.ingredientCode)
+      if (!coreIngredient) throw new Error("Invalid ingredient selected")
+
+      let purchaseItemId = ""
+
+      for (const dispatch of dispatches) {
+        let farmItem = items.find(i => i.code === coreIngredient.code && i.farmId === dispatch.farmId)
+
+        if (!farmItem) {
+          const newItemRow = {
+            id: `item-${coreIngredient.code}-${dispatch.farmId}-${Date.now()}`,
+            farmId: dispatch.farmId,
+            code: coreIngredient.code,
+            name: coreIngredient.name,
+            category: coreIngredient.category,
+            unit: coreIngredient.unit,
+            openingStock: 0,
+            openingValue: 0,
+            currentStock: dispatch.quantity,
+            averageCost: purchase.unitRate,
+            reorderLevel: 500,
+            createdAt: new Date().toISOString()
+          }
+          const { error: iError } = await supabase.from("inventory").insert(newItemRow)
+          if (iError) throw iError
+          purchaseItemId = newItemRow.id
+        } else {
+          const currentStock = Number(farmItem.currentStock || 0)
+          const currentAvgCost = Number(farmItem.averageCost || 0)
+          const newStock = currentStock + dispatch.quantity
+          const newAvg = newStock > 0
+            ? (currentStock * currentAvgCost + dispatch.quantity * purchase.unitRate) / newStock
+            : purchase.unitRate
+
+          await supabase.from("inventory")
+            .update({ currentStock: newStock, averageCost: newAvg })
+            .eq("id", farmItem.id)
+
+          purchaseItemId = farmItem.id
+        }
+      }
+
       const purchaseRow = {
         id: Date.now().toString(),
-        ...purchase,
+        date: purchase.date,
+        supplierId: purchase.supplierId,
+        itemId: purchaseItemId,
         quantity: totalQty,
+        unitRate: purchase.unitRate,
         totalAmount,
+        invoiceNumber: purchase.invoiceNumber,
         createdAt: new Date().toISOString(),
       }
 
       const { data: savedPurchase, error: pError } = await supabase.from("purchases").insert(purchaseRow).select().single()
       if (pError) throw pError
-
-      // Distribute to each farm
-      const targetItem = items.find(i => i.id === purchase.itemId)
-      if (!targetItem) throw new Error("Ingredient not found in Item Master")
-
-      for (const dispatch of dispatches) {
-        // Find the item record for this specific farm
-        let farmItem = items.find(i => i.code === targetItem.code && i.farmId === dispatch.farmId)
-
-        if (!farmItem) {
-          // If the item doesn't exist for this farm, create it
-          const newItemRow = {
-            id: `item-${targetItem.code}-${dispatch.farmId || 'godown'}-${Date.now()}`,
-            farmId: dispatch.farmId,
-            code: targetItem.code,
-            name: targetItem.name,
-            category: targetItem.category,
-            unit: targetItem.unit,
-            openingStock: 0,
-            openingValue: 0,
-            currentStock: dispatch.quantity,
-            averageCost: purchase.unitRate,
-            reorderLevel: targetItem.reorderLevel,
-            createdAt: new Date().toISOString()
-          }
-          const { error: iError } = await supabase.from("inventory").insert(newItemRow)
-          if (iError) {
-            console.error(`Failed to create inventory for farm ${dispatch.farmId}:`, iError)
-            throw new Error(`Failed to initialize stock for one of the farms.`)
-          }
-        } else {
-          // Update existing stock
-          const currentStock = Number(farmItem.currentStock || 0)
-          const currentAvgCost = Number(farmItem.averageCost || 0)
-          const newStock = currentStock + dispatch.quantity
-
-          // Weighted average cost calculation
-          const newAvg = newStock > 0
-            ? (currentStock * currentAvgCost + dispatch.quantity * purchase.unitRate) / newStock
-            : purchase.unitRate
-
-          const { error: uError } = await supabase.from("inventory")
-            .update({ currentStock: newStock, averageCost: newAvg })
-            .eq("id", farmItem.id)
-
-          if (uError) {
-            console.error(`Failed to update inventory for farm ${dispatch.farmId}:`, uError)
-            throw new Error(`Failed to update stock for one of the farms.`)
-          }
-        }
-      }
 
       await fetchInventory()
       return savedPurchase as PurchaseEntry
@@ -401,17 +402,19 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     const sourceItem = items.find(i => i.id === transfer.itemId)
     if (!sourceItem) throw new Error("Source item not found")
 
+    if (!transfer.sourceFarmId || !transfer.destinationFarmId) {
+      throw new Error("Source and destination farms are required.")
+    }
+
     if (Number(sourceItem.currentStock) < Number(transfer.quantity)) {
       throw new Error(`Insufficient stock in source location. Available: ${sourceItem.currentStock}`)
     }
 
-    // Find destination item (same code, different farmId)
     let destItem = items.find(i => i.code === sourceItem.code && i.farmId === transfer.destinationFarmId)
 
     if (!destItem) {
-      // Create destination item if not exists
       const newItemRow = {
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `item-${sourceItem.code}-${transfer.destinationFarmId}-${Date.now()}`,
         farmId: transfer.destinationFarmId,
         code: sourceItem.code,
         name: sourceItem.name,
@@ -427,16 +430,13 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.from("inventory").insert(newItemRow)
       if (error) throw error
     } else {
-      // Update destination stock and avg cost
       const newStock = Number(destItem.currentStock) + Number(transfer.quantity)
       const newAvg = newStock > 0 ? (Number(destItem.currentStock) * Number(destItem.averageCost) + (transfer.quantity * sourceItem.averageCost)) / newStock : sourceItem.averageCost
       await supabase.from("inventory").update({ currentStock: newStock, averageCost: newAvg }).eq("id", destItem.id)
     }
 
-    // Update source stock
     await supabase.from("inventory").update({ currentStock: Number(sourceItem.currentStock) - Number(transfer.quantity) }).eq("id", sourceItem.id)
 
-    // Record transfer
     const transferRow = {
       id: Date.now().toString(),
       ...transfer,
@@ -448,21 +448,14 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }
 
   const initializeCoreItems = async (farms: { id: string }[]) => {
-    const coreItems = [
-      { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
-      { code: "SOYA", name: "Soya", category: "feed-raw", unit: "kg" },
-      { code: "BROKENRICE", name: "Broken Rice (Nukalu)", category: "feed-raw", unit: "kg" },
-      { code: "SUPPL-5", name: "5% Supplement", category: "feed-raw", unit: "kg" },
-    ]
-
-    const locations = [null, ...farms.map(f => f.id)]
+    const locations = farms.map(f => f.id)
 
     for (const farmId of locations) {
-      for (const core of coreItems) {
+      for (const core of CORE_INGREDIENTS) {
         const existing = items.find(i => i.code === core.code && i.farmId === farmId)
         if (!existing) {
           const row = {
-            id: `item-${core.code}-${farmId || 'godown'}-${Date.now()}`,
+            id: `item-${core.code}-${farmId}-${Date.now()}`,
             farmId,
             code: core.code,
             name: core.name,
@@ -472,7 +465,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             openingValue: 0,
             currentStock: 0,
             averageCost: 0,
-            reorderLevel: 500, // Default reorder level
+            reorderLevel: 500,
             createdAt: new Date().toISOString()
           }
           await supabase.from("inventory").insert(row)
