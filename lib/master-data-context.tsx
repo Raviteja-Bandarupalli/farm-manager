@@ -125,7 +125,7 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     const coreItems = [
       { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
       { code: "SOYA", name: "Soya", category: "feed-raw", unit: "kg" },
-      { code: "BROKENRICE", name: "Broken Rice (Nukalu)", category: "feed-raw", unit: "kg" },
+      { code: "BROKENRICE", name: "Broken Rice", category: "feed-raw", unit: "kg" },
       { code: "SUPPL-5", name: "5% Supplement", category: "feed-raw", unit: "kg" },
     ]
 

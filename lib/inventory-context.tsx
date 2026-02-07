@@ -8,7 +8,7 @@ import { logFetchError } from "@/lib/supabase-errors"
 export const CORE_INGREDIENTS = [
   { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
   { code: "SOYA", name: "Soya", category: "feed-raw", unit: "kg" },
-  { code: "BROKENRICE", name: "Broken Rice (Nukalu)", category: "feed-raw", unit: "kg" },
+  { code: "BROKENRICE", name: "Broken Rice", category: "feed-raw", unit: "kg" },
   { code: "SUPPL-5", name: "5% Supplement", category: "feed-raw", unit: "kg" },
 ] as const
 

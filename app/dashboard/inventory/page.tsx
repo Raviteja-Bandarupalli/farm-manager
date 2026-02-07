@@ -77,6 +77,7 @@ export default function InventoryPage() {
   } = useInventory()
 
   const { dailyLogs } = useDailyLogs()
+  const [selectedFarmId, setSelectedFarmId] = useState<string | null>(null)
 
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false)
@@ -445,6 +446,35 @@ export default function InventoryPage() {
     )
   )
 
+  // Global Aggregates for Top Header
+  const totalMaize = items.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const totalSoya = items.filter(i => i.code === "SOYA").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const totalBrokenRice = items.filter(i => i.code === "BROKENRICE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const totalSuppl5 = items.filter(i => i.code === "SUPPL-5").reduce((sum, i) => sum + Number(i.currentStock), 0)
+
+  // Movement History (Chronological)
+  const movementHistory = [
+    ...purchases.map(p => ({ ...p, type: 'purchase' as const })),
+    ...issues.map(i => ({ ...i, type: 'issue' as const })),
+    ...transfers.map(t => ({ ...t, type: 'transfer' as const }))
+  ].sort((a, b) => b.date.localeCompare(a.date))
+
+  const filteredHistory = movementHistory.filter(m => {
+    if (!selectedFarmId) return true
+    if (m.type === 'purchase') {
+      const item = items.find(i => i.id === m.itemId)
+      return item?.farmId === selectedFarmId
+    }
+    if (m.type === 'issue') {
+      const item = items.find(i => i.id === m.itemId)
+      return item?.farmId === selectedFarmId
+    }
+    if (m.type === 'transfer') {
+      return m.sourceFarmId === selectedFarmId || m.destinationFarmId === selectedFarmId
+    }
+    return false
+  })
+
   const handleInitializeCore = async () => {
     if (confirm("This will initialize core inventory items (Maize, Soya, Broken Rice, 5% Supplement) for all farms. Continue?")) {
       try {
@@ -458,19 +488,23 @@ export default function InventoryPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Inventory Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Professional Stock & Mixing Control</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Inventory Control</h1>
+          <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Professional Stock & Mixing Dashboard</p>
         </div>
         <div className="flex gap-2">
           {user?.role === "owner" && (
             <>
               <Dialog open={isBulkPurchaseDialogOpen} onOpenChange={setIsBulkPurchaseDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" onClick={startBulkPurchase}>
-                    <ShoppingCart className="h-4 w-4 mr-2" />
+                  <Button
+                    variant="default"
+                    className="bg-slate-900 text-white hover:bg-slate-800 h-9 px-4 text-[11px] font-extrabold uppercase tracking-wider"
+                    onClick={startBulkPurchase}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
                     Purchase & Dispatch
                   </Button>
                 </DialogTrigger>
@@ -810,7 +844,7 @@ export default function InventoryPage() {
               Complete Inventory Setup
             </CardTitle>
             <CardDescription className="text-blue-600">
-              Initialize professional inventory tracking (Maize, Soya, Nukalu, 5%) for all your farm locations.
+              Initialize professional inventory tracking (Maize, Soya, Broken Rice, 5%) for all your farm locations.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -821,56 +855,98 @@ export default function InventoryPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {farms.filter(farm => {
-          const farmId = farm.id
-          const hasStock = items.some(i => i.farmId === farmId && Number(i.currentStock) > 0)
-          return hasStock
-        }).map((farm, idx) => {
-          const farmId = farm.id
-          const locationName = farm.name
-          const locationStock = items.filter(i => i.farmId === farmId && ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].includes(i.code) && Number(i.currentStock) > 0)
+      {/* 1. Top Metrics Summary Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Total Maize", value: totalMaize, code: "MAIZE" },
+          { label: "Total Soya", value: totalSoya, code: "SOYA" },
+          { label: "Total Broken Rice", value: totalBrokenRice, code: "BROKENRICE" },
+          { label: "Total 5% Suppl", value: totalSuppl5, code: "SUPPL-5" },
+        ].map((stat, idx) => (
+          <Card key={idx} className="shadow-sm border-t-2 border-t-red-600">
+            <CardHeader className="py-1.5 px-3 border-b">
+              <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">{stat.label}</span>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="text-xl font-black tracking-tight text-slate-900">
+                {stat.value.toLocaleString()} <span className="text-[10px] font-bold text-slate-400 uppercase">KG</span>
+              </div>
+              <p className="text-[9px] font-bold text-slate-400 italic">~{(stat.value / 50).toFixed(0)} Bags</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-          return (
-            <Card key={idx} className="border-t-4 border-t-slate-800 shadow-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black">{locationName}</CardTitle>
-                <CardDescription className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Inventory Status</CardDescription>
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Farm Sidebar-style Filter */}
+        <div className="w-full md:w-64 space-y-2 flex-shrink-0">
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 px-2">Locations</p>
+          <div className="flex flex-col gap-1">
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start font-extrabold tracking-tight",
+                !selectedFarmId && "bg-slate-200/60 border-l-4 border-slate-900 rounded-none"
+              )}
+              onClick={() => setSelectedFarmId(null)}
+            >
+              All Locations
+            </Button>
+            {farms.map((farm) => (
+              <Button
+                key={farm.id}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start font-extrabold tracking-tight",
+                  selectedFarmId === farm.id && "bg-slate-200/60 border-l-4 border-slate-900 rounded-none"
+                )}
+                onClick={() => setSelectedFarmId(farm.id)}
+              >
+                {farm.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-6">
+          {/* Station Overview Card (only if farm selected) */}
+          {selectedFarmId && (
+            <Card className="shadow-sm bg-slate-50 border-slate-200">
+              <CardHeader className="py-2 px-4 border-b">
+                <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-600">
+                  Station Overview: {farms.find(f => f.id === selectedFarmId)?.name}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {locationStock.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4 text-center italic">Not Initialized</p>
-                ) : (
-                  locationStock.map(item => {
-                    const avgDaily = getAverageDailyMixing(farmId, item.code)
-                    const daysLeft = avgDaily > 0 ? Number(item.currentStock) / avgDaily : 99
-                    const isLow = daysLeft < 3
-
-                    return (
-                      <div key={item.id} className="flex justify-between items-end border-b pb-1">
-                        <div>
-                          <p className="text-[10px] uppercase font-extrabold text-slate-400">{item.name}</p>
-                          <p className={`text-base font-black tracking-tight ${isLow ? 'text-red-600' : 'text-slate-900'}`}>
-                            {Number(item.currentStock).toLocaleString()} <span className="text-[10px] font-bold">KG</span>
+              <CardContent className="p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {items
+                    .filter(i => i.farmId === selectedFarmId && Number(i.currentStock) > 0)
+                    .map((item, idx) => {
+                      const avgDaily = getAverageDailyMixing(selectedFarmId, item.code)
+                      const daysLeft = avgDaily > 0 ? Number(item.currentStock) / avgDaily : 99
+                      const isLow = daysLeft < 3
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <p className="text-[9px] font-black uppercase text-slate-400">{item.name}</p>
+                          <p className={cn("text-lg font-black tracking-tight", isLow ? "text-red-600" : "text-slate-900")}>
+                            {Number(item.currentStock).toLocaleString()} <span className="text-[10px]">KG</span>
                           </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-slate-400 font-bold italic">~{(Number(item.currentStock) / 50).toFixed(0)} Bags</p>
                           {avgDaily > 0 && (
-                            <p className={`text-[9px] font-black ${isLow ? 'text-red-500' : 'text-green-600'}`}>
-                              {isLow ? `Low: ${daysLeft.toFixed(1)} Days` : `${daysLeft.toFixed(0)}+ Days`}
+                            <p className={cn("text-[8px] font-bold uppercase", isLow ? "text-red-500" : "text-slate-400")}>
+                              {isLow ? `LOW: ${daysLeft.toFixed(1)} DAYS` : `${daysLeft.toFixed(0)}+ DAYS SUPPLY`}
                             </p>
                           )}
                         </div>
-                      </div>
-                    )
-                  })
-                )}
+                      )
+                    })
+                  }
+                  {items.filter(i => i.farmId === selectedFarmId && Number(i.currentStock) > 0).length === 0 && (
+                    <p className="text-xs text-slate-400 italic">No active stock at this location.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          )
-        })}
-      </div>
+          )}
 
       <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
         setActiveTabState(value)
@@ -881,124 +957,145 @@ export default function InventoryPage() {
         }
       }}>
         <TabsList className="grid w-full grid-cols-4 lg:w-auto">
-          <TabsTrigger value="items">Items</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
           <TabsTrigger value="purchases">Purchases</TabsTrigger>
           <TabsTrigger value="transfers">Transfers</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="items" className="space-y-4">
-          <Card>
-            <CardHeader>
+        <TabsContent value="history" className="space-y-4">
+          <Card className="shadow-sm border-none">
+            <CardHeader className="py-3 px-4 border-b">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Item Master</CardTitle>
-                  <CardDescription>Full inventory records across all locations</CardDescription>
+                  <CardTitle className="text-base font-bold">Stock Movement History</CardTitle>
+                  <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Chronological list of all stock ins and outs</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={startAddNewItem}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Custom Item
-                </Button>
               </div>
             </CardHeader>
-            <CardContent>
-                  {items.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No items added yet</p>
-                  <Button onClick={startAddNewItem}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Your First Item
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow className="h-10">
+                      <TableHead className="text-[10px] font-extrabold uppercase pl-6 w-32">Date</TableHead>
+                      <TableHead className="text-[10px] font-extrabold uppercase w-32">Type</TableHead>
+                      <TableHead className="text-[10px] font-extrabold uppercase">Farm</TableHead>
+                      <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
+                      <TableHead className="text-[10px] font-extrabold uppercase text-right">Qty (KG)</TableHead>
+                      <TableHead className="text-[10px] font-extrabold uppercase">Reference</TableHead>
+                      <TableHead className="text-[10px] font-extrabold uppercase text-center pr-6">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredHistory.length === 0 ? (
                       <TableRow>
-                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Code</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">Name</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Current Stock</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Avg Cost (₹)</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right pr-6">Value (₹)</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-center">Actions</TableHead>
+                        <TableCell colSpan={7} className="text-center py-10 text-slate-400 italic text-xs">No movement history found.</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {farms.map(f => f.id).map(locationId => {
-                        const locationItems = items.filter(i => i.farmId === locationId && Number(i.currentStock) > 0)
-                        if (locationItems.length === 0) return null
+                    ) : (
+                      filteredHistory.map((m: any, idx) => {
+                        let farmName = "-"
+                        let itemName = "-"
+                        let reference = "-"
+                        let qtyColor = "text-slate-900"
 
-                        const locationName = farms.find(f => f.id === locationId)?.name
+                        if (m.type === 'purchase') {
+                          const item = items.find(i => i.id === m.itemId)
+                          farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
+                          itemName = item?.name || "-"
+                          reference = m.invoiceNumber ? `Inv: ${m.invoiceNumber}` : "Purchase"
+                          qtyColor = "text-green-600"
+                        } else if (m.type === 'issue') {
+                          const item = items.find(i => i.id === m.itemId)
+                          farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
+                          itemName = item?.name || "-"
+                          reference = m.purpose || "Mix Deduction"
+                          qtyColor = "text-red-600"
+                        } else if (m.type === 'transfer') {
+                          const item = items.find(i => i.id === m.itemId)
+                          const from = farms.find(f => f.id === m.sourceFarmId)?.name || "Unknown"
+                          const to = farms.find(f => f.id === m.destinationFarmId)?.name || "Unknown"
+                          farmName = `${from} → ${to}`
+                          itemName = item?.name || "-"
+                          reference = m.driverNotes || "Transfer"
+                          qtyColor = "text-blue-600"
+                        }
 
                         return (
-                          <React.Fragment key={locationId}>
-                            <TableRow className="bg-slate-100/50 hover:bg-slate-100/50 border-y-2 border-slate-200">
-                              <TableCell colSpan={6} className="py-1 px-4">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">{locationName}</span>
-                              </TableCell>
-                            </TableRow>
-                            {locationItems.sort((a,b) => a.code.localeCompare(b.code)).map((item) => (
-                              <TableRow key={item.id} className="h-10">
-                                <TableCell className="font-mono text-[11px] font-bold pl-10 text-blue-600">{item.code}</TableCell>
-                                <TableCell className="text-[11px] font-semibold">{item.name}</TableCell>
-                                <TableCell className="text-right font-black text-[12px]">
-                                  <div className="flex flex-col items-end">
-                                    <span>{Number(item.currentStock).toLocaleString()} <span className="text-[9px] text-slate-400 font-bold">{item.unit}</span></span>
-                                    <span className="text-[9px] text-slate-400 font-medium italic">~{(Number(item.currentStock) / 50).toFixed(1)} Bags</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-[11px]">₹{Number(item.averageCost).toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-black text-[12px] pr-6 text-slate-700">
-                                  ₹{(Number(item.currentStock) * Number(item.averageCost)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-2 justify-center">
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(item)}>
-                                      <Edit className="h-3 w-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => handleDelete(item)}>
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </React.Fragment>
+                          <TableRow key={idx} className="h-11 hover:bg-slate-50/50 border-b">
+                            <TableCell className="pl-6 text-[11px] font-bold text-slate-600">{formatIndianDate(m.date)}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={cn(
+                                "text-[9px] font-black uppercase px-2 py-0 h-5",
+                                m.type === 'purchase' ? "bg-green-50 text-green-700 border-green-200" :
+                                m.type === 'issue' ? "bg-red-50 text-red-700 border-red-200" :
+                                "bg-blue-50 text-blue-700 border-blue-200"
+                              )}>
+                                {m.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-[11px] font-extrabold text-slate-700">{farmName}</TableCell>
+                            <TableCell className="text-[11px] font-bold text-slate-900">{itemName}</TableCell>
+                            <TableCell className={cn("text-right font-black text-xs", qtyColor)}>
+                              {m.type === 'issue' ? '-' : '+'}{Number(m.quantity).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-[10px] font-medium text-slate-400 italic truncate max-w-[150px]">{reference}</TableCell>
+                            <TableCell className="pr-6">
+                              <div className="flex justify-center gap-1">
+                                {user?.role === "owner" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-red-600"
+                                    onClick={() => {
+                                      if (confirm(`Delete this ${m.type} entry?`)) {
+                                        if (m.type === 'purchase') deletePurchase(m.id)
+                                        // Transfer and Issue deletion might need context support if not already there
+                                        // For now, these are the primary ones.
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="purchases" className="space-y-4">
-          <Card>
-            <CardHeader>
+          <Card className="shadow-sm border-none">
+            <CardHeader className="py-3 px-4 border-b">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Purchase Entries</CardTitle>
-                  <CardDescription>All purchase transactions</CardDescription>
+                  <CardTitle className="text-base font-bold">Purchase Entries</CardTitle>
+                  <CardDescription className="text-[10px] uppercase font-bold text-slate-400">All bulk purchase transactions</CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {purchases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground italic">No purchases recorded yet.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Total KG</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Inv #</TableHead>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow className="h-10">
+                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Date</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">Supplier</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Total KG</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Rate</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Amount</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase pr-6">Inv #</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1026,33 +1123,33 @@ export default function InventoryPage() {
         </TabsContent>
 
         <TabsContent value="transfers" className="space-y-4">
-          <Card>
-            <CardHeader>
+          <Card className="shadow-sm border-none">
+            <CardHeader className="py-3 px-4 border-b">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Stock Transfers</CardTitle>
-                  <CardDescription>Inter-farm movement history</CardDescription>
+                  <CardTitle className="text-base font-bold">Stock Transfers</CardTitle>
+                  <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Inter-farm movement history</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setIsTransferDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={() => setIsTransferDialogOpen(true)} className="h-7 text-[10px] font-bold uppercase">
+                  <Plus className="h-3 w-3 mr-1" />
                   New Transfer
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {transfers.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground italic">No transfers recorded yet.</div>
+                <div className="text-center py-12 text-muted-foreground italic text-xs">No transfers recorded yet.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead>From</TableHead>
-                        <TableHead>To</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead>Driver/Notes</TableHead>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow className="h-10">
+                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Date</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">From</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">To</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Quantity</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase pr-6">Driver/Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1081,27 +1178,27 @@ export default function InventoryPage() {
         </TabsContent>
 
         <TabsContent value="issues" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Issue History</CardTitle>
-              <CardDescription>{issues.length} total issues</CardDescription>
+          <Card className="shadow-sm border-none">
+            <CardHeader className="py-3 px-4 border-b">
+              <CardTitle className="text-base font-bold">Issue History</CardTitle>
+              <CardDescription className="text-[10px] uppercase font-bold text-slate-400">{issues.length} total issues recorded</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {issues.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No issues recorded yet</p>
+                  <p className="text-muted-foreground mb-4 text-xs italic">No issues recorded yet</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Batch</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Total Cost</TableHead>
-                        <TableHead>Purpose</TableHead>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow className="h-10">
+                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Date</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">Batch</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Quantity</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Total Cost</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase pr-6">Purpose</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

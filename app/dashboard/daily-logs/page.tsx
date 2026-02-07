@@ -679,7 +679,7 @@ export default function DailyLogsPage() {
                         {[
                           { id: "maize_kg", label: "Maize", code: "MAIZE" },
                           { id: "soya_kg", label: "Soya", code: "SOYA" },
-                          { id: "brokenrice_kg", label: "Nukalu", code: "BROKENRICE" },
+                          { id: "brokenrice_kg", label: "Broken Rice", code: "BROKENRICE" },
                           { id: "suppl5_kg", label: "5% Suppl.", code: "SUPPL-5" },
                         ].map((item) => {
                           const house = houses.find(h => h.id === formData.houseId)
