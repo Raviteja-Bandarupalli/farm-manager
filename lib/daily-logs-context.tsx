@@ -68,7 +68,7 @@ function recalculateBatchLogs(
   batchId: string,
   allLogs: DailyLog[],
   batches: { id: string; initialBirds: number }[],
-  weeklyFeeds: { batchId: string; weekEnd: string; totalFeedKg: number }[],
+  weeklyFeeds: { batchId: string; weekEnd: string; totalFeedKg: number; averageWeightKg: number }[],
 ): DailyLog[] {
   const batch = batches.find((b) => b.id === batchId)
   const initialBirds = batch?.initialBirds ?? 0
@@ -85,6 +85,7 @@ function recalculateBatchLogs(
     const openingBirds = i === 0 ? initialBirds : out[i - 1].closingBirds
     const closingBirds = openingBirds - cur.mortality
     const cumulativeMortality = i === 0 ? cur.mortality : out[i - 1].cumulativeMortality + cur.mortality
+
     // Calculate cumulative feed using both old weekly feeds and new daily mix
     const weeklyFeedSum = weeklyFeeds
       .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
@@ -96,15 +97,25 @@ function recalculateBatchLogs(
 
     const cumulativeFeed = dailyMixSum > 0 ? dailyMixSum : weeklyFeedSum
     const cumulativeMortalityPercent = initialBirds > 0 ? (cumulativeMortality / initialBirds) * 100 : 0
+
+    // Calculate FCR if weight is available from weekly feed records
+    const latestWeeklyWeight = weeklyFeeds
+      .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
+      .sort((a, b) => b.weekEnd.localeCompare(a.weekEnd))[0]?.averageWeightKg || 0
+
+    const cumulativeFCR = (latestWeeklyWeight > 0 && closingBirds > 0)
+      ? cumulativeFeed / (closingBirds * latestWeeklyWeight)
+      : 0
+
     out.push({
       ...cur,
-      id: cur.id, // Explicitly preserve id
+      id: cur.id,
       openingBirds,
       closingBirds,
       cumulativeMortality,
       cumulativeFeed,
       cumulativeMortalityPercent,
-      cumulativeFCR: 0,
+      cumulativeFCR,
     })
   }
   return out
@@ -176,14 +187,17 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       cumulativeFCR: 0,
     }
     
-    console.log("[DailyLogs] Creating new log with ID:", logId)
-    
     const allLogs = [...dailyLogs, newLog]
     const recalc = recalculateBatchLogs(
       log.batchId,
       allLogs,
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
-      weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
+      weeklyFeeds.map((f) => ({
+        batchId: f.batchId,
+        weekEnd: f.weekEnd,
+        totalFeedKg: f.totalFeedKg,
+        averageWeightKg: f.averageWeightKg
+      })),
     )
     const saved = recalc.find((l) => l.id === logId)
     if (!saved) throw new Error("Failed to recalculate daily log")
@@ -193,8 +207,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     if (!finalId) {
       throw new Error("Daily log ID is missing - cannot save")
     }
-    console.log("[DailyLogs] Saving log with ID:", finalId, "Row keys:", Object.keys(saved))
-    
     // Ensure id is explicitly included and not null - use logId as ultimate fallback
     const safeId = finalId || logId || `log-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     if (!safeId) {
@@ -240,11 +252,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       console.warn("[DailyLogs] ID was missing, generated new one:", row.id)
     }
     
-    console.log("[DailyLogs] Inserting row with ID:", row.id, "Type:", typeof row.id, "Length:", row.id?.length)
-    console.log("[DailyLogs] Row preview:", { id: row.id, batchId: row.batchId, date: row.date, mortality: row.mortality })
-    console.log("[DailyLogs] Full row object keys:", Object.keys(row))
-    console.log("[DailyLogs] Row.id value:", row.id, "Is null?", row.id === null, "Is undefined?", row.id === undefined)
-    
     // Create a fresh object to ensure ID is not lost
     const insertPayload = {
       id: String(row.id), // Force string conversion
@@ -278,16 +285,10 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       console.warn("[DailyLogs] Insert payload ID was invalid, regenerated:", insertPayload.id)
     }
     
-    console.log("[DailyLogs] Insert payload ID:", insertPayload.id)
-    
     const { data, error } = await supabase.from("daily_logs").insert(insertPayload).select()
     if (error) {
-      console.error("[DailyLogs] Insert error:", error)
-      console.error("[DailyLogs] Insert payload that failed:", JSON.stringify(insertPayload, null, 2))
-      console.error("[DailyLogs] Original row:", JSON.stringify(row, null, 2))
       throw error
     }
-    console.log("[DailyLogs] Successfully inserted:", data)
     // Deduct from inventory
     if (insertPayload.total_feed_mixed > 0) {
       const house = houses.find(h => h.id === insertPayload.houseId)
@@ -328,7 +329,12 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       updated.batchId,
       allLogs,
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
-      weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
+      weeklyFeeds.map((f) => ({
+        batchId: f.batchId,
+        weekEnd: f.weekEnd,
+        totalFeedKg: f.totalFeedKg,
+        averageWeightKg: f.averageWeightKg
+      })),
     )
     const final = recalc.find((l) => l.id === id)!
 
@@ -406,7 +412,12 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       log.batchId,
       remaining,
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
-      weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
+      weeklyFeeds.map((f) => ({
+        batchId: f.batchId,
+        weekEnd: f.weekEnd,
+        totalFeedKg: f.totalFeedKg,
+        averageWeightKg: f.averageWeightKg
+      })),
     )
     for (const r of recalc) {
       const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }

@@ -124,6 +124,26 @@ export default function InventoryPage() {
     dispatches: [] as { farmId: string | null; quantity: string; bags: string; manualOverride: boolean }[]
   })
 
+  const handleDispatchChange = (index: number, field: string, value: string) => {
+    const newDispatches = [...bulkPurchaseForm.dispatches]
+    const d = { ...newDispatches[index] }
+
+    if (field === 'quantity') {
+      d.quantity = value
+      d.manualOverride = true
+    } else if (field === 'bags') {
+      d.bags = value
+      const bags = Number(value)
+      if (bags >= 0) {
+        d.quantity = (bags * 50).toString()
+        d.manualOverride = false
+      }
+    }
+
+    newDispatches[index] = d
+    setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
+  }
+
   const [transferForm, setTransferForm] = useState({
     date: getTodayDate(),
     itemId: "", // Source item ID
@@ -319,10 +339,18 @@ export default function InventoryPage() {
         supplierId: bulkPurchaseForm.supplierId,
         itemId: bulkPurchaseForm.itemId,
         unitRate: 0,
-        invoiceNumber: "CHALLAN",
+        invoiceNumber: "CHALLAN-" + Date.now().toString().slice(-6),
         quantity: lorryTotalKg,
       }, activeDispatches)
 
+      setBulkPurchaseForm({
+        date: getTodayDate(),
+        supplierId: "",
+        itemId: "",
+        totalKg: "",
+        totalBags: "",
+        dispatches: []
+      })
       setIsBulkPurchaseDialogOpen(false)
     } catch (err) {
       console.error("Bulk purchase failed:", err)
@@ -484,7 +512,13 @@ export default function InventoryPage() {
                         <label className="text-[10px] font-black uppercase text-slate-500">Ingredient</label>
                         <Select
                           value={bulkPurchaseForm.itemId}
-                          onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, itemId: v })}
+                          onValueChange={(v) => {
+                            const initialDispatches = [
+                              { farmId: null, quantity: "", bags: "", manualOverride: false },
+                              ...farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
+                            ]
+                            setBulkPurchaseForm({ ...bulkPurchaseForm, itemId: v, dispatches: initialDispatches })
+                          }}
                           required
                         >
                           <SelectTrigger className="h-10 bg-white">
@@ -573,17 +607,7 @@ export default function InventoryPage() {
                                       placeholder="0"
                                       className="h-10 font-bold"
                                       value={dispatch.bags}
-                                      onChange={(e) => {
-                                        const bags = e.target.value
-                                        const qty = Number(bags) * 50
-                                        const newDispatches = [...bulkPurchaseForm.dispatches]
-                                        newDispatches[idx] = {
-                                          ...dispatch,
-                                          bags,
-                                          quantity: dispatch.manualOverride ? dispatch.quantity : (bags ? String(qty) : "")
-                                        }
-                                        setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
-                                      }}
+                                      onChange={(e) => handleDispatchChange(idx, 'bags', e.target.value)}
                                     />
                                   </td>
                                   <td className="py-2 px-4">
@@ -594,16 +618,7 @@ export default function InventoryPage() {
                                         placeholder="0.0"
                                         className={`h-10 w-32 font-black text-right ${dispatch.manualOverride ? 'border-amber-400 bg-amber-50' : ''}`}
                                         value={dispatch.quantity}
-                                        onChange={(e) => {
-                                          const qty = e.target.value
-                                          const newDispatches = [...bulkPurchaseForm.dispatches]
-                                          newDispatches[idx] = {
-                                            ...dispatch,
-                                            quantity: qty,
-                                            manualOverride: true
-                                          }
-                                          setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
-                                        }}
+                                        onChange={(e) => handleDispatchChange(idx, 'quantity', e.target.value)}
                                       />
                                       <span className="text-[10px] font-bold text-slate-400">KG</span>
                                     </div>
@@ -809,13 +824,20 @@ export default function InventoryPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[null, ...farms].map((farm, idx) => {
+        {[null, ...farms].filter(farm => {
+          const farmId = farm?.id || null
+          const farmHouses = houses.filter(h => h.farmId === farmId)
+          const farmHouseIds = farmHouses.map(h => h.id)
+          const hasActiveBatch = batches.some(b => farmHouseIds.includes(b.houseId) && b.status === "active")
+          const hasStock = items.some(i => i.farmId === farmId && Number(i.currentStock) > 0)
+          return hasActiveBatch || hasStock || farmId === null // Always show Main Godown
+        }).map((farm, idx) => {
           const farmId = farm?.id || null
           const locationName = farm?.name || "Main Godown"
           const locationStock = items.filter(i => i.farmId === farmId && ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].includes(i.code))
 
           return (
-            <Card key={idx} className="border-t-4 border-t-slate-800">
+            <Card key={idx} className="border-t-4 border-t-slate-800 shadow-md">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-black">{locationName}</CardTitle>
                 <CardDescription className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Inventory Status</CardDescription>
@@ -896,45 +918,57 @@ export default function InventoryPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-slate-50">
                       <TableRow>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="text-right">Current Stock</TableHead>
-                        <TableHead className="text-right">Avg Cost (₹)</TableHead>
-                        <TableHead className="text-right">Value (₹)</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Code</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase">Name</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Current Stock</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Avg Cost (₹)</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-right pr-6">Value (₹)</TableHead>
+                        <TableHead className="text-[10px] font-extrabold uppercase text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...items].sort((a,b) => (a.farmId || '').localeCompare(b.farmId || '')).map((item) => {
-                        const farm = farms.find(f => f.id === item.farmId)
-                        const locationName = item.farmId === null ? "Main Godown" : farm?.name || "Unknown"
+                      {[null, ...farms.map(f => f.id)].map(locationId => {
+                        const locationItems = items.filter(i => i.farmId === locationId)
+                        if (locationItems.length === 0) return null
+
+                        const locationName = locationId === null ? "Main Godown (Central Storage)" : farms.find(f => f.id === locationId)?.name
 
                         return (
-                          <TableRow key={item.id}>
-                            <TableCell className="text-[10px] font-bold uppercase text-slate-500">{locationName}</TableCell>
-                            <TableCell className="font-medium">{item.code}</TableCell>
-                            <TableCell>{item.name}</TableCell>
-                            <TableCell className="text-right font-bold">
-                              {Number(item.currentStock).toLocaleString()} {item.unit}
-                            </TableCell>
-                            <TableCell className="text-right">₹{Number(item.averageCost).toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-bold text-slate-700">
-                              ₹{(Number(item.currentStock) * Number(item.averageCost)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2 justify-center">
-                                <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
-                                  <Edit className="h-3 w-3" />
-                                </Button>
-                                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(item)}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={locationId || 'godown'}>
+                            <TableRow className="bg-slate-100/50 hover:bg-slate-100/50 border-y-2 border-slate-200">
+                              <TableCell colSpan={6} className="py-1 px-4">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">{locationName}</span>
+                              </TableCell>
+                            </TableRow>
+                            {locationItems.sort((a,b) => a.code.localeCompare(b.code)).map((item) => (
+                              <TableRow key={item.id} className="h-10">
+                                <TableCell className="font-mono text-[11px] font-bold pl-10 text-blue-600">{item.code}</TableCell>
+                                <TableCell className="text-[11px] font-semibold">{item.name}</TableCell>
+                                <TableCell className="text-right font-black text-[12px]">
+                                  <div className="flex flex-col items-end">
+                                    <span>{Number(item.currentStock).toLocaleString()} <span className="text-[9px] text-slate-400 font-bold">{item.unit}</span></span>
+                                    <span className="text-[9px] text-slate-400 font-medium italic">~{(Number(item.currentStock) / 50).toFixed(1)} Bags</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-[11px]">₹{Number(item.averageCost).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-black text-[12px] pr-6 text-slate-700">
+                                  ₹{(Number(item.currentStock) * Number(item.averageCost)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-2 justify-center">
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(item)}>
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => handleDelete(item)}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </React.Fragment>
                         )
                       })}
                     </TableBody>
