@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
+import { useFinance } from "./finance-context"
 
 export const CORE_INGREDIENTS = [
   { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
@@ -120,6 +121,7 @@ interface InventoryContextType {
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined)
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
+  const { addTransaction } = useFinance()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [purchases, setPurchases] = useState<PurchaseEntry[]>([])
   const [issues, setIssues] = useState<IssueEntry[]>([])
@@ -220,15 +222,14 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   ): Promise<PurchaseEntry | null> => {
     try {
       const totalQty = dispatches.reduce((sum, d) => sum + d.quantity, 0)
-      const totalAmount = totalQty * purchase.unitRate
-
       const coreIngredient = CORE_INGREDIENTS.find(c => c.code === purchase.ingredientCode)
       if (!coreIngredient) throw new Error("Invalid ingredient selected")
 
-      let purchaseItemId = ""
+      let lastPurchaseItemId = ""
 
       for (const dispatch of dispatches) {
         let farmItem = items.find(i => i.code === coreIngredient.code && i.farmId === dispatch.farmId)
+        const dispatchCost = dispatch.quantity * purchase.unitRate
 
         if (!farmItem) {
           const newItemRow = {
@@ -247,7 +248,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           }
           const { error: iError } = await supabase.from("inventory").insert(newItemRow)
           if (iError) throw iError
-          purchaseItemId = newItemRow.id
+          lastPurchaseItemId = newItemRow.id
         } else {
           const currentStock = Number(farmItem.currentStock || 0)
           const currentAvgCost = Number(farmItem.averageCost || 0)
@@ -260,18 +261,29 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             .update({ currentStock: newStock, averageCost: newAvg })
             .eq("id", farmItem.id)
 
-          purchaseItemId = farmItem.id
+          lastPurchaseItemId = farmItem.id
         }
+
+        // Create Finance Entry per farm
+        await addTransaction({
+          type: "expense",
+          category: "Feed Purchase",
+          amount: dispatchCost,
+          date: purchase.date,
+          description: `${coreIngredient.name} Purchase - ${dispatch.quantity}kg`,
+          reference: purchase.invoiceNumber || "BULK_PURCHASE",
+          farmId: dispatch.farmId
+        })
       }
 
       const purchaseRow = {
         id: Date.now().toString(),
         date: purchase.date,
         supplierId: purchase.supplierId,
-        itemId: purchaseItemId,
+        itemId: lastPurchaseItemId, // Reference the last farm's item as a placeholder
         quantity: totalQty,
         unitRate: purchase.unitRate,
-        totalAmount,
+        totalAmount: totalQty * purchase.unitRate,
         invoiceNumber: purchase.invoiceNumber,
         createdAt: new Date().toISOString(),
       }

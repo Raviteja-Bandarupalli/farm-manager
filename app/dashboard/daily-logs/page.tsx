@@ -35,7 +35,7 @@ interface MortalityBySection {
 }
 
 export default function DailyLogsPage() {
-  const { houses: allHouses, farms: allFarms, feedTypes } = useMasterData()
+  const { houses: allHouses, farms: allFarms } = useMasterData()
   const { batches, getActiveBatchByHouse } = useBatch()
   const { user } = useAuth()
   const { getWorkersByIds, getWorkerById } = useWorkers()
@@ -65,7 +65,6 @@ export default function DailyLogsPage() {
     houseId: "",
     date: getTodayDate(),
     mortality: "",
-    feedTypeId: "",
     maize_kg: "0",
     soya_kg: "0",
     brokenrice_kg: "0",
@@ -189,7 +188,6 @@ export default function DailyLogsPage() {
           date: formData.date,
           mortality: finalMortality,
           sectionMortality: sectionMortalityData,
-          feedTypeId: formData.feedTypeId,
           maize_kg: Number(formData.maize_kg),
           soya_kg: Number(formData.soya_kg),
           brokenrice_kg: Number(formData.brokenrice_kg),
@@ -207,7 +205,6 @@ export default function DailyLogsPage() {
           date: formData.date,
           mortality: finalMortality,
           sectionMortality: sectionMortalityData,
-          feedTypeId: formData.feedTypeId,
           maize_kg: Number(formData.maize_kg),
           soya_kg: Number(formData.soya_kg),
           brokenrice_kg: Number(formData.brokenrice_kg),
@@ -223,7 +220,10 @@ export default function DailyLogsPage() {
         houseId: "",
         date: getTodayDate(),
         mortality: "",
-        feedTypeId: "",
+        maize_kg: "0",
+        soya_kg: "0",
+        brokenrice_kg: "0",
+        suppl5_kg: "0",
         temperature: "",
         humidity: "",
         remarks: "",
@@ -287,11 +287,10 @@ export default function DailyLogsPage() {
       houseId: log.houseId,
       date: log.date,
       mortality: log.mortality.toString(),
-      feedTypeId: log.feedTypeId || "",
-        maize_kg: log.maize_kg?.toString() || "0",
-        soya_kg: log.soya_kg?.toString() || "0",
-        brokenrice_kg: log.brokenrice_kg?.toString() || "0",
-        suppl5_kg: log.suppl5_kg?.toString() || "0",
+      maize_kg: log.maize_kg?.toString() || "0",
+      soya_kg: log.soya_kg?.toString() || "0",
+      brokenrice_kg: log.brokenrice_kg?.toString() || "0",
+      suppl5_kg: log.suppl5_kg?.toString() || "0",
       temperature: log.temperature?.toString() || "",
       humidity: log.humidity?.toString() || "",
       remarks: log.remarks || "",
@@ -343,9 +342,6 @@ export default function DailyLogsPage() {
     return allFarms.find((f) => f.id === house.farmId)?.name || "Unknown Farm"
   }
 
-  const getFeedTypeName = (feedTypeId: string) => {
-    return feedTypes.find((f) => f.id === feedTypeId)?.name || "Unknown Feed"
-  }
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
   const accessibleLogs = filteredLogs.filter((log) => {
@@ -362,7 +358,6 @@ export default function DailyLogsPage() {
       houseId: "",
       date: getTodayDate(),
       mortality: "",
-      feedTypeId: "",
       maize_kg: "0",
       soya_kg: "0",
       brokenrice_kg: "0",
@@ -711,25 +706,6 @@ export default function DailyLogsPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Keep old feed type for history/other needs but hidden by default if mixing used */}
-                  <div className="space-y-2 opacity-50">
-                    <label className="text-xs font-medium">Other Feed (Optional)</label>
-                    <Select
-                      value={formData.feedTypeId}
-                      onValueChange={(value) => setFormData({ ...formData, feedTypeId: value })}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select feed type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {feedTypes.map((type) => (
-                          <SelectItem key={type.id} value={type.id}>
-                            {type.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -899,11 +875,7 @@ export default function DailyLogsPage() {
                       <TableCell>{getHouseName(log.houseId)}</TableCell>
                       <TableCell>{log.mortality}</TableCell>
                       <TableCell>
-                        {log.total_feed_mixed > 0 ? (
-                          <span className="font-bold text-blue-700">{log.total_feed_mixed.toLocaleString()} kg</span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">{getFeedTypeName(log.feedTypeId)}</span>
-                        )}
+                        <span className="font-bold text-blue-700">{Number(log.total_feed_mixed || 0).toLocaleString()} kg</span>
                       </TableCell>
                       <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
                       <TableCell>

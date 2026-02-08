@@ -51,21 +51,21 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <AuthProvider>
           <MasterDataProvider>
-            <WorkersProvider>
-              <BatchProvider>
-                <BatchSectionsProvider>
-                  <WeeklyFeedProvider>
-                    <InventoryProvider>
-                      <DailyLogsProvider>
-                        <BatchCostingProvider>
-                          <FinanceProvider>{children}</FinanceProvider>
-                        </BatchCostingProvider>
-                      </DailyLogsProvider>
-                    </InventoryProvider>
-                  </WeeklyFeedProvider>
-                </BatchSectionsProvider>
-              </BatchProvider>
-            </WorkersProvider>
+            <FinanceProvider>
+              <WorkersProvider>
+                <BatchProvider>
+                  <BatchSectionsProvider>
+                    <WeeklyFeedProvider>
+                      <InventoryProvider>
+                        <DailyLogsProvider>
+                          <BatchCostingProvider>{children}</BatchCostingProvider>
+                        </DailyLogsProvider>
+                      </InventoryProvider>
+                    </WeeklyFeedProvider>
+                  </BatchSectionsProvider>
+                </BatchProvider>
+              </WorkersProvider>
+            </FinanceProvider>
           </MasterDataProvider>
         </AuthProvider>
         <Analytics />

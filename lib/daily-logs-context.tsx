@@ -86,7 +86,7 @@ function recalculateBatchLogs(
     const closingBirds = openingBirds - cur.mortality
     const cumulativeMortality = i === 0 ? cur.mortality : out[i - 1].cumulativeMortality + cur.mortality
 
-    // Calculate cumulative feed using both old weekly feeds and new daily mix
+    // Calculate cumulative feed: Sum of all daily mix entries + any legacy weekly feed entries
     const weeklyFeedSum = weeklyFeeds
       .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
       .reduce((s, f) => s + Number(f.totalFeedKg), 0)
@@ -95,7 +95,7 @@ function recalculateBatchLogs(
       .slice(0, i + 1)
       .reduce((s, l) => s + Number(l.total_feed_mixed || 0), 0)
 
-    const cumulativeFeed = dailyMixSum > 0 ? dailyMixSum : weeklyFeedSum
+    const cumulativeFeed = dailyMixSum + weeklyFeedSum
     const cumulativeMortalityPercent = initialBirds > 0 ? (cumulativeMortality / initialBirds) * 100 : 0
 
     // Calculate FCR if weight is available from weekly feed records

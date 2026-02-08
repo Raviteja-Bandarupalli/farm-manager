@@ -40,10 +40,10 @@ const CATEGORIES = [
 
 export default function InventoryPage() {
   const searchParams = useSearchParams()
-  const [activeTabState, setActiveTabState] = useState("items")
+  const [activeTabState, setActiveTabState] = useState("history")
   
   useEffect(() => {
-    const tab = searchParams.get("tab") || "items"
+    const tab = searchParams.get("tab") || "history"
     setActiveTabState(tab)
   }, [searchParams])
   
@@ -121,6 +121,7 @@ export default function InventoryPage() {
     ingredientCode: "",
     totalKg: "",
     totalBags: "",
+    totalCost: "",
     dispatches: [] as { farmId: string; quantity: string; bags: string; manualOverride: boolean }[]
   })
 
@@ -302,6 +303,7 @@ export default function InventoryPage() {
       ingredientCode: "",
       totalKg: "",
       totalBags: "",
+      totalCost: "",
       dispatches: farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
     })
     setIsBulkPurchaseDialogOpen(true)
@@ -340,11 +342,13 @@ export default function InventoryPage() {
     }
 
     try {
+      const unitRate = Number(bulkPurchaseForm.totalCost || 0) / lorryTotalKg
+
       await addBulkPurchaseAndDispatch({
         date: bulkPurchaseForm.date,
         supplierId: bulkPurchaseForm.supplierId,
         ingredientCode: bulkPurchaseForm.ingredientCode,
-        unitRate: 0,
+        unitRate: unitRate,
         invoiceNumber: "CHALLAN-" + Date.now().toString().slice(-6),
         quantity: lorryTotalKg,
       }, activeDispatches)
@@ -355,6 +359,7 @@ export default function InventoryPage() {
         ingredientCode: "",
         totalKg: "",
         totalBags: "",
+        totalCost: "",
         dispatches: []
       })
       setIsBulkPurchaseDialogOpen(false)
@@ -440,6 +445,11 @@ export default function InventoryPage() {
   const lowStockItems = getLowStockItems()
   const totalValue = items.reduce((sum, item) => sum + (Number(item.currentStock) * Number(item.averageCost)), 0)
 
+  // Calculate global "Days Stock Left" (Average across all farms for Maize)
+  const globalMaizeDaily = farms.reduce((sum, f) => sum + getAverageDailyMixing(f.id, "MAIZE"), 0)
+  const globalMaizeStock = items.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const globalDaysLeft = globalMaizeDaily > 0 ? globalMaizeStock / globalMaizeDaily : 0
+
   const isCoreSetupComplete = farms.every(farm =>
     ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].every(code =>
       items.some(item => item.code === code && item.farmId === farm.id)
@@ -449,15 +459,17 @@ export default function InventoryPage() {
   // Global Aggregates for Top Header
   const totalMaize = items.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
   const totalSoya = items.filter(i => i.code === "SOYA").reduce((sum, i) => sum + Number(i.currentStock), 0)
-  const totalBrokenRice = items.filter(i => i.code === "BROKENRICE").reduce((sum, i) => sum + Number(i.currentStock), 0)
-  const totalSuppl5 = items.filter(i => i.code === "SUPPL-5").reduce((sum, i) => sum + Number(i.currentStock), 0)
 
   // Movement History (Chronological)
   const movementHistory = [
     ...purchases.map(p => ({ ...p, type: 'purchase' as const })),
     ...issues.map(i => ({ ...i, type: 'issue' as const })),
     ...transfers.map(t => ({ ...t, type: 'transfer' as const }))
-  ].sort((a, b) => b.date.localeCompare(a.date))
+  ].sort((a, b) => {
+    const dateComp = b.date.localeCompare(a.date)
+    if (dateComp !== 0) return dateComp
+    return (b as any).createdAt?.localeCompare((a as any).createdAt) || 0
+  })
 
   const filteredHistory = movementHistory.filter(m => {
     if (!selectedFarmId) return true
@@ -488,11 +500,11 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between py-1">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight">Inventory Control</h1>
-          <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Professional Stock & Mixing Dashboard</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Inventory Dashboard</h1>
+          <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Centralized Stock & Mixing Control</p>
         </div>
         <div className="flex gap-2">
           {user?.role === "owner" && (
@@ -505,7 +517,7 @@ export default function InventoryPage() {
                     onClick={startBulkPurchase}
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Purchase & Dispatch
+                    RECORD STOCK INTAKE
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl">
@@ -514,7 +526,7 @@ export default function InventoryPage() {
                       <div>
                         <h2 className="text-2xl font-black tracking-tight flex items-center gap-2 uppercase">
                           <ShoppingCart className="h-6 w-6" />
-                          LORRY DELIVERY CHALLAN
+                          RECORD STOCK INTAKE
                         </h2>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Weight Tracking & Distribution</p>
                       </div>
@@ -585,10 +597,20 @@ export default function InventoryPage() {
                           />
                         </div>
                         <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-slate-600">Total Cost (₹) *</label>
+                          <Input
+                            type="number"
+                            className="h-12 text-xl font-black border-2 border-slate-900 text-green-700"
+                            value={bulkPurchaseForm.totalCost}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
                           <label className="text-[10px] font-black uppercase text-slate-600">Total Bags in Bill</label>
                           <Input
                             type="number"
-                            className="h-12 text-xl font-black border-2 border-slate-900"
+                            className="h-12 text-xl font-black border-2 border-slate-200"
                             value={bulkPurchaseForm.totalBags}
                             onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
                           />
@@ -855,26 +877,55 @@ export default function InventoryPage() {
         </Card>
       )}
 
-      {/* 1. Top Metrics Summary Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Total Maize", value: totalMaize, code: "MAIZE" },
-          { label: "Total Soya", value: totalSoya, code: "SOYA" },
-          { label: "Total Broken Rice", value: totalBrokenRice, code: "BROKENRICE" },
-          { label: "Total 5% Suppl", value: totalSuppl5, code: "SUPPL-5" },
-        ].map((stat, idx) => (
-          <Card key={idx} className="shadow-sm border-t-2 border-t-red-600">
-            <CardHeader className="py-1.5 px-3 border-b">
-              <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">{stat.label}</span>
-            </CardHeader>
-            <CardContent className="p-3">
-              <div className="text-xl font-black tracking-tight text-slate-900">
-                {stat.value.toLocaleString()} <span className="text-[10px] font-bold text-slate-400 uppercase">KG</span>
-              </div>
-              <p className="text-[9px] font-bold text-slate-400 italic">~{(stat.value / 50).toFixed(0)} Bags</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* 1. High-Density Scoreboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Stock Value</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">
+              ₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Across all locations</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Stock Left</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className={cn("text-xl font-black tracking-tight", globalDaysLeft < 3 ? "text-red-600" : "text-green-600")}>
+              {globalDaysLeft > 0 ? globalDaysLeft.toFixed(1) : "0.0"} <span className="text-[10px] uppercase">Days</span>
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Based on 7-day mix avg</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Maize (KG)</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">
+              {totalMaize.toLocaleString()}
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(totalMaize / 50).toFixed(0)} Bags</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Soya (KG)</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">
+              {totalSoya.toLocaleString()}
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(totalSoya / 50).toFixed(0)} Bags</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">
@@ -908,45 +959,63 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="flex-1 space-y-6">
-          {/* Station Overview Card (only if farm selected) */}
-          {selectedFarmId && (
-            <Card className="shadow-sm bg-slate-50 border-slate-200">
-              <CardHeader className="py-2 px-4 border-b">
-                <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-600">
-                  Station Overview: {farms.find(f => f.id === selectedFarmId)?.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {items
-                    .filter(i => i.farmId === selectedFarmId && Number(i.currentStock) > 0)
-                    .map((item, idx) => {
-                      const avgDaily = getAverageDailyMixing(selectedFarmId, item.code)
-                      const daysLeft = avgDaily > 0 ? Number(item.currentStock) / avgDaily : 99
-                      const isLow = daysLeft < 3
-                      return (
-                        <div key={idx} className="space-y-1">
-                          <p className="text-[9px] font-black uppercase text-slate-400">{item.name}</p>
-                          <p className={cn("text-lg font-black tracking-tight", isLow ? "text-red-600" : "text-slate-900")}>
-                            {Number(item.currentStock).toLocaleString()} <span className="text-[10px]">KG</span>
-                          </p>
-                          {avgDaily > 0 && (
-                            <p className={cn("text-[8px] font-bold uppercase", isLow ? "text-red-500" : "text-slate-400")}>
-                              {isLow ? `LOW: ${daysLeft.toFixed(1)} DAYS` : `${daysLeft.toFixed(0)}+ DAYS SUPPLY`}
-                            </p>
-                          )}
-                        </div>
-                      )
-                    })
-                  }
-                  {items.filter(i => i.farmId === selectedFarmId && Number(i.currentStock) > 0).length === 0 && (
-                    <p className="text-xs text-slate-400 italic">No active stock at this location.</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <div className="flex-1 space-y-4">
+          {/* Station Overview Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {(selectedFarmId ? farms.filter(f => f.id === selectedFarmId) : farms).map((farm) => {
+              const farmItems = items.filter(i => i.farmId === farm.id && Number(i.currentStock) > 0)
+              if (farmItems.length === 0) return null
+
+              return (
+                <Card key={farm.id} className="shadow-sm border-none">
+                  <CardHeader className="py-2 px-3 border-b bg-slate-50/50 flex flex-row items-center justify-between">
+                    <CardTitle className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                      {farm.name}
+                    </CardTitle>
+                    <Link href={`/dashboard/daily-logs?farmId=${farm.id}`} className="text-[9px] font-bold text-slate-400 uppercase hover:text-slate-900">
+                      View Logs →
+                    </Link>
+                  </CardHeader>
+                  <CardContent className="p-3">
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                      {CORE_INGREDIENTS.map((core) => {
+                        const item = farmItems.find(i => i.code === core.code)
+                        const stock = item ? Number(item.currentStock) : 0
+                        if (stock <= 0) return null
+
+                        const avgDaily = getAverageDailyMixing(farm.id, core.code)
+                        const daysLeft = avgDaily > 0 ? stock / avgDaily : 99
+                        const isLow = daysLeft < 3
+
+                        return (
+                          <div key={core.code} className="space-y-0.5">
+                            <p className="text-[9px] font-extrabold uppercase text-slate-400 tracking-tight">{core.name}</p>
+                            <div className="flex items-baseline gap-1">
+                              <p className={cn(
+                                "text-base font-black tracking-tighter",
+                                isLow ? "text-red-600" : "text-slate-900"
+                              )}>
+                                {stock.toLocaleString()}
+                              </p>
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">KG</span>
+                                <span className="text-[8px] font-bold text-slate-300 uppercase -mt-1">~{(stock / 50).toFixed(0)} Bags</span>
+                              </div>
+                            </div>
+                            {avgDaily > 0 && (
+                              <p className={cn("text-[8px] font-black uppercase tracking-tighter", isLow ? "text-red-500 animate-pulse" : "text-slate-400")}>
+                                {daysLeft < 1 ? "< 1 Day Left" : `${daysLeft.toFixed(0)} Days Left`}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
 
       <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
         setActiveTabState(value)
