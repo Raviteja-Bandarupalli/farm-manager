@@ -69,7 +69,7 @@ export default function FinancePage() {
     date: getTodayDate(),
     description: "",
     reference: "",
-    farm_id: "",
+    farmId: "",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,7 +78,7 @@ export default function FinancePage() {
       const payload = {
         ...formData,
         amount: Number.parseFloat(formData.amount),
-        farm_id: formData.farm_id === "none" || formData.farm_id === "" ? undefined : formData.farm_id,
+        farmId: formData.farmId === "none" || formData.farmId === "" ? undefined : formData.farmId,
       }
       if (editingId) {
         await updateTransaction(editingId, payload)
@@ -92,7 +92,7 @@ export default function FinancePage() {
         date: getTodayDate(),
         description: "",
         reference: "",
-        farm_id: "",
+        farmId: "",
       })
       setEditingId(null)
       setIsDialogOpen(false)
@@ -111,7 +111,7 @@ export default function FinancePage() {
       date: transaction.date,
       description: transaction.description,
       reference: transaction.reference,
-      farm_id: transaction.farm_id || "",
+      farmId: transaction.farmId || "",
     })
     setIsDialogOpen(true)
   }
@@ -190,7 +190,7 @@ export default function FinancePage() {
                   date: getTodayDate(),
                   description: "",
                   reference: "",
-                  farm_id: "",
+                  farmId: "",
                 })
               }}
             >
@@ -222,8 +222,8 @@ export default function FinancePage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Farm (Optional)</label>
                 <Select
-                  value={formData.farm_id || "none"}
-                  onValueChange={(value) => setFormData({ ...formData, farm_id: value })}
+                  value={formData.farmId || "none"}
+                  onValueChange={(value) => setFormData({ ...formData, farmId: value })}
                 >
                   <SelectTrigger className="h-12">
                     <SelectValue placeholder="Global / No Farm" />
@@ -503,7 +503,7 @@ export default function FinancePage() {
                       </TableCell>
                       <TableCell className="font-medium">{transaction.category}</TableCell>
                       <TableCell className="text-xs font-bold text-slate-500">
-                        {farms.find(f => f.id === transaction.farm_id)?.name || "-"}
+                        {farms.find(f => f.id === transaction.farmId)?.name || "-"}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{transaction.description || "-"}</TableCell>
                       <TableCell>{transaction.reference || "-"}</TableCell>

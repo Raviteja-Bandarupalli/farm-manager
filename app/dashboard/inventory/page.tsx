@@ -271,7 +271,7 @@ export default function InventoryPage() {
             date: purchaseForm.date,
             description: `${desc}${ref}`,
             reference: purchaseForm.invoiceNumber || "",
-            farm_id: item.farmId,
+            farmId: item.farmId,
           })
           if (tx) await linkPurchaseToFinance(newPurchase.id, tx.id)
         }
