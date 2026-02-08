@@ -271,6 +271,7 @@ export default function InventoryPage() {
             date: purchaseForm.date,
             description: `${desc}${ref}`,
             reference: purchaseForm.invoiceNumber || "",
+            farmId: item.farmId,
           })
           if (tx) await linkPurchaseToFinance(newPurchase.id, tx.id)
         }
@@ -546,7 +547,7 @@ export default function InventoryPage() {
 
                   <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-6 bg-white">
                     {/* Horizontal Header Row for Master Data */}
-                    <div className="grid grid-cols-5 gap-2 bg-slate-50 p-2.5 rounded-lg border items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2 bg-slate-50 p-2.5 rounded-lg border items-end">
                       <div className="space-y-1">
                         <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Supplier</label>
                         <Select
@@ -718,12 +719,12 @@ export default function InventoryPage() {
 
                     {/* Summary & Submit */}
                     <div className="flex flex-col gap-4 pt-4 border-t">
-                      <div className="flex items-center justify-center">
-                        {(() => {
+                      <div className="flex items-center justify-center min-h-8">
+                        {Number(bulkPurchaseForm.totalKg) > 0 && (() => {
                           const totalDispatched = bulkPurchaseForm.dispatches.reduce((s, d) => s + Number(d.quantity || 0), 0)
                           const lorryTotal = Number(bulkPurchaseForm.totalKg || 0)
                           const remaining = lorryTotal - totalDispatched
-                          const isMatch = Math.abs(remaining) < 0.1
+                          const isMatch = Math.abs(remaining) < 0.05
 
                           return (
                             <div className="flex items-center gap-2">
@@ -736,7 +737,7 @@ export default function InventoryPage() {
                                 <>
                                   <span className="text-red-600 text-sm">❌</span>
                                   <span className="text-[11px] font-black uppercase tracking-widest text-red-600">
-                                    {remaining > 0
+                                    {remaining > 0.05
                                       ? `WAITING FOR ${remaining.toFixed(2)} KG MORE TO BE ASSIGNED.`
                                       : `OVER-ASSIGNED BY ${Math.abs(remaining).toFixed(2)} KG.`}
                                   </span>

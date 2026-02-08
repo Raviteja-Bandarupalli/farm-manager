@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   date DATE NOT NULL,
   description TEXT NOT NULL,
   reference TEXT NOT NULL,
+  "farmId" TEXT,
   "createdAt" TIMESTAMP DEFAULT NOW()
 );
 ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;

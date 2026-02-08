@@ -11,4 +11,12 @@
  ⚠ Minimum recommended TypeScript version is v5.1.0, older versions can potentially be incompatible with Next.js. Detected: 5.0.2
  ✓ Ready in 2.5s
  ○ Compiling /login ...
- GET /login 200 in 8.2s (compile: 7.5s, render: 718ms)
+ GET /login 200 in 8.9s (compile: 7.9s, render: 955ms)
+ GET /login 200 in 95ms (compile: 5ms, render: 89ms)
+ GET /dashboard 200 in 984ms (compile: 886ms, render: 99ms)
+ GET /login 200 in 111ms (compile: 5ms, render: 106ms)
+ GET /dashboard 200 in 42ms (compile: 4ms, render: 38ms)
+ GET /dashboard/inventory 200 in 1238ms (compile: 1158ms, render: 80ms)
+ GET /login 200 in 65ms (compile: 4ms, render: 61ms)
+ GET /dashboard 200 in 36ms (compile: 3ms, render: 33ms)
+ GET /dashboard/inventory 200 in 266ms (compile: 146ms, render: 121ms)
