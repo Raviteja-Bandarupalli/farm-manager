@@ -273,7 +273,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           date: purchase.date,
           description: `${coreIngredient.name} Purchase - ${dispatch.quantity}kg`,
           reference: purchase.invoiceNumber || "BULK_PURCHASE",
-          farmId: dispatch.farmId
+          farm_id: dispatch.farmId
         })
 
         // Create Purchase Entry per farm for clean ledger
