@@ -546,16 +546,16 @@ export default function InventoryPage() {
 
                   <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-6 bg-white">
                     {/* Horizontal Header Row for Master Data */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-lg border">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-lg border items-start">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-500">Supplier</label>
+                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Supplier</label>
                         <Select
                           value={bulkPurchaseForm.supplierId}
                           onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
                           required
                         >
                           <SelectTrigger className="h-9 bg-white text-[11px] font-bold">
-                            <SelectValue placeholder="Supplier" />
+                            <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
                             {suppliers.map((s) => (
@@ -565,7 +565,7 @@ export default function InventoryPage() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-500">Ingredient</label>
+                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Ingredient</label>
                         <Select
                           value={bulkPurchaseForm.ingredientCode}
                           onValueChange={(v) => {
@@ -575,7 +575,7 @@ export default function InventoryPage() {
                           required
                         >
                           <SelectTrigger className="h-9 bg-white text-[11px] font-bold">
-                            <SelectValue placeholder="Item" />
+                            <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
                             {CORE_INGREDIENTS.map((core) => (
@@ -587,7 +587,7 @@ export default function InventoryPage() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-500">Total KG *</label>
+                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Total KG</label>
                         <Input
                           type="number"
                           step="0.1"
@@ -598,7 +598,7 @@ export default function InventoryPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-500">Total Price (₹) *</label>
+                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Total Price (₹)</label>
                         <Input
                           type="number"
                           className="h-9 bg-white text-[11px] font-bold"
@@ -608,7 +608,7 @@ export default function InventoryPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-500">Total Bags *</label>
+                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Total Bags</label>
                         <Input
                           type="number"
                           className="h-9 bg-white text-[11px] font-bold"
@@ -635,7 +635,7 @@ export default function InventoryPage() {
                           <thead className="bg-slate-50 border-b">
                             <tr>
                               <th className="py-2 px-4 font-black uppercase text-[10px]">Location</th>
-                              <th className="py-2 px-4 font-black uppercase text-[10px] w-32">Bags (Primary)</th>
+                              <th className="py-2 px-4 font-black uppercase text-[10px] w-32">Bags</th>
                               <th className="py-2 px-4 font-black uppercase text-[10px] w-48 text-right">Exact KG</th>
                               <th className="py-2 px-4 w-12"></th>
                             </tr>
@@ -665,7 +665,7 @@ export default function InventoryPage() {
                                         placeholder="0.0"
                                         className={cn(
                                           "h-9 w-32 font-black text-right",
-                                          dispatch.manualOverride ? "border-amber-400 bg-amber-50" : "bg-slate-50 border-slate-200"
+                                          dispatch.manualOverride ? "border-amber-400 bg-amber-50" : "bg-slate-100 border-slate-200 text-slate-500"
                                         )}
                                         value={dispatch.quantity}
                                         onChange={(e) => handleDispatchChange(idx, 'quantity', e.target.value)}
@@ -717,27 +717,40 @@ export default function InventoryPage() {
                     </div>
 
                     {/* Summary & Submit */}
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <div className="flex gap-4">
-                        <div className={cn(
-                          "px-4 py-2 rounded border",
-                          Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) < 0.1
-                          ? 'bg-green-50 border-green-200 text-green-700'
-                          : 'bg-amber-50 border-amber-200 text-amber-700'
-                        )}>
-                          <p className="text-[9px] font-black uppercase opacity-70">Weight Variance</p>
-                          <p className="text-sm font-black">
-                            {(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)).toFixed(2)} KG
-                          </p>
-                        </div>
+                    <div className="flex flex-col gap-4 pt-4 border-t">
+                      <div className="flex items-center justify-center">
+                        {(() => {
+                          const totalDispatched = bulkPurchaseForm.dispatches.reduce((s, d) => s + Number(d.quantity || 0), 0)
+                          const lorryTotal = Number(bulkPurchaseForm.totalKg || 0)
+                          const remaining = lorryTotal - totalDispatched
+                          const isMatch = Math.abs(remaining) < 0.1
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              {isMatch ? (
+                                <>
+                                  <span className="text-green-600 text-sm">✅</span>
+                                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-green-700">All stock assigned. Ready to record.</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-red-600 text-sm">❌</span>
+                                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-red-600">
+                                    Waiting for {remaining > 0 ? remaining.toFixed(2) : 0} KG more to be assigned.
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
 
-                      <div className="flex gap-2">
-                        <Button variant="outline" type="button" onClick={() => setIsBulkPurchaseDialogOpen(false)} className="font-bold uppercase text-[11px]">Cancel</Button>
+                      <div className="flex items-center justify-between">
+                        <Button variant="outline" type="button" onClick={() => setIsBulkPurchaseDialogOpen(false)} className="font-bold uppercase text-[11px] h-10 px-6">Cancel</Button>
                         <Button
                           type="submit"
-                          className="font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 px-8"
-                          disabled={Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) > 0.1}
+                          className="font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 px-10 h-10"
+                          disabled={Math.abs((bulkPurchaseForm.dispatches.reduce((s, d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) > 0.1}
                         >
                           Confirm & Record Stock
                         </Button>
