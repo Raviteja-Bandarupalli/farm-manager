@@ -547,76 +547,81 @@ export default function InventoryPage() {
 
                   <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-6 bg-white">
                     {/* Horizontal Header Row for Master Data */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2 bg-slate-50 p-2.5 rounded-lg border items-end">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Supplier</label>
-                        <Select
-                          value={bulkPurchaseForm.supplierId}
-                          onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
-                          required
-                        >
-                          <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div className="space-y-2 bg-slate-50 p-2.5 rounded-lg border">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Supplier</label>
+                          <Select
+                            value={bulkPurchaseForm.supplierId}
+                            onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
+                            required
+                          >
+                            <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
+                              <SelectValue placeholder="Select Supplier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {suppliers.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Ingredient</label>
+                          <Select
+                            value={bulkPurchaseForm.ingredientCode}
+                            onValueChange={(v) => {
+                              const initialDispatches = farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
+                              setBulkPurchaseForm({ ...bulkPurchaseForm, ingredientCode: v, dispatches: initialDispatches })
+                            }}
+                            required
+                          >
+                            <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
+                              <SelectValue placeholder="Select Ingredient" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CORE_INGREDIENTS.map((core) => (
+                                <SelectItem key={core.code} value={core.code}>
+                                  {core.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Ingredient</label>
-                        <Select
-                          value={bulkPurchaseForm.ingredientCode}
-                          onValueChange={(v) => {
-                            const initialDispatches = farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
-                            setBulkPurchaseForm({ ...bulkPurchaseForm, ingredientCode: v, dispatches: initialDispatches })
-                          }}
-                          required
-                        >
-                          <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CORE_INGREDIENTS.map((core) => (
-                              <SelectItem key={core.code} value={core.code}>
-                                {core.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total KG</label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          className="h-9 bg-white text-xs font-bold border-slate-200"
-                          value={bulkPurchaseForm.totalKg}
-                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Price (₹)</label>
-                        <Input
-                          type="number"
-                          className="h-9 bg-white text-xs font-bold border-slate-200"
-                          value={bulkPurchaseForm.totalCost}
-                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Bags</label>
-                        <Input
-                          type="number"
-                          className="h-9 bg-white text-xs font-bold border-slate-200"
-                          value={bulkPurchaseForm.totalBags}
-                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
-                          required
-                        />
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end pt-1">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total KG</label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            className="h-9 bg-white text-xs font-bold border-slate-200"
+                            value={bulkPurchaseForm.totalKg}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Price (₹)</label>
+                          <Input
+                            type="number"
+                            className="h-9 bg-white text-xs font-bold border-slate-200"
+                            value={bulkPurchaseForm.totalCost}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Bags</label>
+                          <Input
+                            type="number"
+                            className="h-9 bg-white text-xs font-bold border-slate-200"
+                            value={bulkPurchaseForm.totalBags}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
 
