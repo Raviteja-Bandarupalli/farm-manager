@@ -546,15 +546,15 @@ export default function InventoryPage() {
 
                   <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-6 bg-white">
                     {/* Horizontal Header Row for Master Data */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-lg border items-start">
+                    <div className="grid grid-cols-5 gap-2 bg-slate-50 p-2.5 rounded-lg border items-end">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Supplier</label>
+                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Supplier</label>
                         <Select
                           value={bulkPurchaseForm.supplierId}
                           onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
                           required
                         >
-                          <SelectTrigger className="h-9 bg-white text-[11px] font-bold">
+                          <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -565,7 +565,7 @@ export default function InventoryPage() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Ingredient</label>
+                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Ingredient</label>
                         <Select
                           value={bulkPurchaseForm.ingredientCode}
                           onValueChange={(v) => {
@@ -574,7 +574,7 @@ export default function InventoryPage() {
                           }}
                           required
                         >
-                          <SelectTrigger className="h-9 bg-white text-[11px] font-bold">
+                          <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -587,31 +587,31 @@ export default function InventoryPage() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Total KG</label>
+                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total KG</label>
                         <Input
                           type="number"
                           step="0.1"
-                          className="h-9 bg-white text-[11px] font-bold"
+                          className="h-9 bg-white text-xs font-bold border-slate-200"
                           value={bulkPurchaseForm.totalKg}
                           onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
                           required
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Total Price (₹)</label>
+                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Price (₹)</label>
                         <Input
                           type="number"
-                          className="h-9 bg-white text-[11px] font-bold"
+                          className="h-9 bg-white text-xs font-bold border-slate-200"
                           value={bulkPurchaseForm.totalCost}
                           onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
                           required
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 block truncate">Total Bags</label>
+                        <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Bags</label>
                         <Input
                           type="number"
-                          className="h-9 bg-white text-[11px] font-bold"
+                          className="h-9 bg-white text-xs font-bold border-slate-200"
                           value={bulkPurchaseForm.totalBags}
                           onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
                           required
@@ -730,13 +730,15 @@ export default function InventoryPage() {
                               {isMatch ? (
                                 <>
                                   <span className="text-green-600 text-sm">✅</span>
-                                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-green-700">All stock assigned. Ready to record.</span>
+                                  <span className="text-[11px] font-black uppercase tracking-widest text-green-700">ALL STOCK ASSIGNED. READY TO RECORD.</span>
                                 </>
                               ) : (
                                 <>
                                   <span className="text-red-600 text-sm">❌</span>
-                                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-red-600">
-                                    Waiting for {remaining > 0 ? remaining.toFixed(2) : 0} KG more to be assigned.
+                                  <span className="text-[11px] font-black uppercase tracking-widest text-red-600">
+                                    {remaining > 0
+                                      ? `WAITING FOR ${remaining.toFixed(2)} KG MORE TO BE ASSIGNED.`
+                                      : `OVER-ASSIGNED BY ${Math.abs(remaining).toFixed(2)} KG.`}
                                   </span>
                                 </>
                               )}

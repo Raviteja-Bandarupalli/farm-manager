@@ -9,6 +9,6 @@
  ✓ Starting...
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
  ⚠ Minimum recommended TypeScript version is v5.1.0, older versions can potentially be incompatible with Next.js. Detected: 5.0.2
- ✓ Ready in 2.4s
+ ✓ Ready in 2.5s
  ○ Compiling /login ...
- GET /login 200 in 7.8s (compile: 7.0s, render: 722ms)
+ GET /login 200 in 8.2s (compile: 7.5s, render: 718ms)

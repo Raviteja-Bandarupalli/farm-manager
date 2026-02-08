@@ -229,7 +229,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         if (dispatch.quantity <= 0) continue;
 
         let farmItem = items.find(i => i.code === coreIngredient.code && i.farmId === dispatch.farmId)
-        const dispatchCost = dispatch.quantity * purchase.unitRate
+        const dispatchCost = Math.round(dispatch.quantity * purchase.unitRate * 100) / 100
         let targetItemId = ""
 
         if (!farmItem) {
@@ -278,7 +278,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
         // Create Purchase Entry per farm for clean ledger
         const purchaseRow = {
-          id: `${Date.now()}-${dispatch.farmId}`,
+          id: `p-${Date.now()}-${dispatch.farmId}-${Math.random().toString(36).slice(2, 5)}`,
           date: purchase.date,
           supplierId: purchase.supplierId,
           itemId: targetItemId,
