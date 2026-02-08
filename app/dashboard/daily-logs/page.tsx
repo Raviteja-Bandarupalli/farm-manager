@@ -342,6 +342,31 @@ export default function DailyLogsPage() {
     return allFarms.find((f) => f.id === house.farmId)?.name || "Unknown Farm"
   }
 
+  // Calculate 7-day average mixing for alerts
+  const getAverageDailyMixing = (farmId: string | null, code: string) => {
+    const last7Days = new Date()
+    last7Days.setDate(last7Days.getDate() - 7)
+    const dateStr = last7Days.toISOString().split('T')[0]
+
+    const farmHouses = allHouses.filter(h => h.farmId === farmId).map(h => h.id)
+    const logs = dailyLogs.filter(l => {
+      if (l.date < dateStr) return false
+      return farmHouses.includes(l.houseId)
+    })
+
+    if (logs.length === 0) return 0
+
+    let total = 0
+    logs.forEach(l => {
+      if (code === "MAIZE") total += Number(l.maize_kg || 0)
+      if (code === "SOYA") total += Number(l.soya_kg || 0)
+      if (code === "BROKENRICE") total += Number(l.brokenrice_kg || 0)
+      if (code === "SUPPL-5") total += Number(l.suppl5_kg || 0)
+    })
+
+    return total / 7
+  }
+
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
   const accessibleLogs = filteredLogs.filter((log) => {
@@ -678,14 +703,19 @@ export default function DailyLogsPage() {
                           { id: "suppl5_kg", label: "5% Suppl.", code: "SUPPL-5" },
                         ].map((item) => {
                           const house = houses.find(h => h.id === formData.houseId)
-                          const invItem = getItemByCodeAndFarm(item.code, house?.farmId || null)
+                          const farmId = house?.farmId || null
+                          const invItem = getItemByCodeAndFarm(item.code, farmId)
                           const stock = invItem ? Number(invItem.currentStock) : 0
+
+                          const avgDaily = getAverageDailyMixing(farmId, item.code)
+                          const daysLeft = avgDaily > 0 ? stock / avgDaily : 99
+                          const isLow = daysLeft < 3
 
                           return (
                             <div key={item.id} className="space-y-1">
                               <label className="text-[10px] font-black uppercase text-slate-500 flex justify-between">
                                 {item.label}
-                                <span className={stock < 100 ? 'text-red-600' : 'text-slate-400'}>Stock: {stock.toLocaleString()}</span>
+                                <span className={isLow ? 'text-red-600 animate-pulse' : 'text-slate-400'}>Stock: {stock.toLocaleString()}</span>
                               </label>
                               <Input
                                 type="number"

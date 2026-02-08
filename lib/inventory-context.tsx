@@ -225,11 +225,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       const coreIngredient = CORE_INGREDIENTS.find(c => c.code === purchase.ingredientCode)
       if (!coreIngredient) throw new Error("Invalid ingredient selected")
 
-      let lastPurchaseItemId = ""
-
       for (const dispatch of dispatches) {
+        if (dispatch.quantity <= 0) continue;
+
         let farmItem = items.find(i => i.code === coreIngredient.code && i.farmId === dispatch.farmId)
         const dispatchCost = dispatch.quantity * purchase.unitRate
+        let targetItemId = ""
 
         if (!farmItem) {
           const newItemRow = {
@@ -248,7 +249,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           }
           const { error: iError } = await supabase.from("inventory").insert(newItemRow)
           if (iError) throw iError
-          lastPurchaseItemId = newItemRow.id
+          targetItemId = newItemRow.id
         } else {
           const currentStock = Number(farmItem.currentStock || 0)
           const currentAvgCost = Number(farmItem.averageCost || 0)
@@ -261,7 +262,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             .update({ currentStock: newStock, averageCost: newAvg })
             .eq("id", farmItem.id)
 
-          lastPurchaseItemId = farmItem.id
+          targetItemId = farmItem.id
         }
 
         // Create Finance Entry per farm
@@ -274,25 +275,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           reference: purchase.invoiceNumber || "BULK_PURCHASE",
           farmId: dispatch.farmId
         })
-      }
 
-      const purchaseRow = {
-        id: Date.now().toString(),
-        date: purchase.date,
-        supplierId: purchase.supplierId,
-        itemId: lastPurchaseItemId, // Reference the last farm's item as a placeholder
-        quantity: totalQty,
-        unitRate: purchase.unitRate,
-        totalAmount: totalQty * purchase.unitRate,
-        invoiceNumber: purchase.invoiceNumber,
-        createdAt: new Date().toISOString(),
+        // Create Purchase Entry per farm for clean ledger
+        const purchaseRow = {
+          id: `${Date.now()}-${dispatch.farmId}`,
+          date: purchase.date,
+          supplierId: purchase.supplierId,
+          itemId: targetItemId,
+          quantity: dispatch.quantity,
+          unitRate: purchase.unitRate,
+          totalAmount: dispatchCost,
+          invoiceNumber: purchase.invoiceNumber,
+          createdAt: new Date().toISOString(),
+        }
+        await supabase.from("purchases").insert(purchaseRow)
       }
-
-      const { data: savedPurchase, error: pError } = await supabase.from("purchases").insert(purchaseRow).select().single()
-      if (pError) throw pError
 
       await fetchInventory()
-      return savedPurchase as PurchaseEntry
+      return null
     } catch (err) {
       console.error("Error in addBulkPurchaseAndDispatch:", err)
       throw err

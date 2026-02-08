@@ -129,16 +129,20 @@ export default function InventoryPage() {
     const newDispatches = [...bulkPurchaseForm.dispatches]
     const d = { ...newDispatches[index] }
 
-    if (field === 'quantity') {
-      d.quantity = value
-      d.manualOverride = true
-    } else if (field === 'bags') {
+    const totalKg = Number(bulkPurchaseForm.totalKg || 0)
+    const totalBags = Number(bulkPurchaseForm.totalBags || 0)
+    const avgKgPerBag = totalBags > 0 ? totalKg / totalBags : 0
+
+    if (field === 'bags') {
       d.bags = value
       const bags = Number(value)
-      if (bags >= 0) {
-        d.quantity = (bags * 50).toString()
+      if (bags >= 0 && avgKgPerBag > 0) {
+        d.quantity = (bags * avgKgPerBag).toFixed(2)
         d.manualOverride = false
       }
+    } else if (field === 'quantity') {
+      d.quantity = value
+      d.manualOverride = true
     }
 
     newDispatches[index] = d
@@ -460,12 +464,26 @@ export default function InventoryPage() {
   const totalMaize = items.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
   const totalSoya = items.filter(i => i.code === "SOYA").reduce((sum, i) => sum + Number(i.currentStock), 0)
 
+  // Low Stock Alerts Count
+  const lowStockAlertsCount = farms.reduce((acc, farm) => {
+    const farmItems = items.filter(i => i.farmId === farm.id)
+    const farmLowCount = CORE_INGREDIENTS.filter(core => {
+      const item = farmItems.find(i => i.code === core.code)
+      const stock = item ? Number(item.currentStock) : 0
+      if (stock <= 0) return false
+      const avgDaily = getAverageDailyMixing(farm.id, core.code)
+      const daysLeft = avgDaily > 0 ? stock / avgDaily : 99
+      return daysLeft < 3
+    }).length
+    return acc + farmLowCount
+  }, 0)
+
   // Movement History (Chronological)
   const movementHistory = [
     ...purchases.map(p => ({ ...p, type: 'purchase' as const })),
     ...issues.map(i => ({ ...i, type: 'issue' as const })),
     ...transfers.map(t => ({ ...t, type: 'transfer' as const }))
-  ].sort((a, b) => {
+  ].filter(m => Number(m.quantity) > 0).sort((a, b) => {
     const dateComp = b.date.localeCompare(a.date)
     if (dateComp !== 0) return dateComp
     return (b as any).createdAt?.localeCompare((a as any).createdAt) || 0
@@ -517,38 +535,27 @@ export default function InventoryPage() {
                     onClick={startBulkPurchase}
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    RECORD STOCK INTAKE
+                    New Stock Entry
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl">
-                  <div className="bg-slate-900 text-white p-6 rounded-t-lg">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h2 className="text-2xl font-black tracking-tight flex items-center gap-2 uppercase">
-                          <ShoppingCart className="h-6 w-6" />
-                          RECORD STOCK INTAKE
-                        </h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Weight Tracking & Distribution</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black uppercase text-slate-500">Date</p>
-                        <p className="font-bold">{formatIndianDate(bulkPurchaseForm.date)}</p>
-                      </div>
-                    </div>
-                  </div>
+                  <DialogHeader className="p-6 border-b bg-white">
+                    <DialogTitle className="text-xl font-black tracking-tight uppercase">New Stock Entry</DialogTitle>
+                    <DialogDescription className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Record bulk purchase and dispatch to farms</DialogDescription>
+                  </DialogHeader>
 
-                  <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-8 bg-white rounded-b-lg">
-                    {/* Header Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border">
+                  <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-6 bg-white">
+                    {/* Horizontal Header Row for Master Data */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-lg border">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-500">Supplier</label>
+                        <label className="text-[9px] font-black uppercase text-slate-500">Supplier</label>
                         <Select
                           value={bulkPurchaseForm.supplierId}
                           onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
                           required
                         >
-                          <SelectTrigger className="h-10 bg-white">
-                            <SelectValue placeholder="Select supplier" />
+                          <SelectTrigger className="h-9 bg-white text-[11px] font-bold">
+                            <SelectValue placeholder="Supplier" />
                           </SelectTrigger>
                           <SelectContent>
                             {suppliers.map((s) => (
@@ -558,7 +565,7 @@ export default function InventoryPage() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-500">Ingredient</label>
+                        <label className="text-[9px] font-black uppercase text-slate-500">Ingredient</label>
                         <Select
                           value={bulkPurchaseForm.ingredientCode}
                           onValueChange={(v) => {
@@ -567,84 +574,68 @@ export default function InventoryPage() {
                           }}
                           required
                         >
-                          <SelectTrigger className="h-10 bg-white">
-                            <SelectValue placeholder="Select ingredient" />
+                          <SelectTrigger className="h-9 bg-white text-[11px] font-bold">
+                            <SelectValue placeholder="Item" />
                           </SelectTrigger>
                           <SelectContent>
                             {CORE_INGREDIENTS.map((core) => (
                               <SelectItem key={core.code} value={core.code}>
-                                {core.code} - {core.name}
+                                {core.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-
-                    {/* Total Lorry Load Section */}
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-1">1. Lorry Total Load</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-600">Total KG in Bill *</label>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            className="h-12 text-xl font-black border-2 border-slate-900"
-                            value={bulkPurchaseForm.totalKg}
-                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-600">Total Cost (₹) *</label>
-                          <Input
-                            type="number"
-                            className="h-12 text-xl font-black border-2 border-slate-900 text-green-700"
-                            value={bulkPurchaseForm.totalCost}
-                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-600">Total Bags in Bill</label>
-                          <Input
-                            type="number"
-                            className="h-12 text-xl font-black border-2 border-slate-200"
-                            value={bulkPurchaseForm.totalBags}
-                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
-                          />
-                        </div>
-                        <div className="col-span-2 flex gap-4">
-                          <div className={`flex-1 p-2 rounded border-2 border-dashed ${
-                            Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) < 0.1
-                            ? 'bg-green-50 border-green-500 text-green-700'
-                            : 'bg-amber-50 border-amber-500 text-amber-700'
-                          }`}>
-                            <p className="text-[9px] font-black uppercase opacity-70">Remaining KG</p>
-                            <p className="text-lg font-black tracking-tighter">
-                              {(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)).toLocaleString()} KG
-                            </p>
-                          </div>
-                          <div className="flex-1 p-2 rounded border-2 border-dashed bg-slate-50 border-slate-200">
-                            <p className="text-[9px] font-black uppercase opacity-70">Remaining Bags</p>
-                            <p className="text-lg font-black tracking-tighter">
-                              {(Number(bulkPurchaseForm.totalBags || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.bags || 0), 0)).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-500">Total KG *</label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          className="h-9 bg-white text-[11px] font-bold"
+                          value={bulkPurchaseForm.totalKg}
+                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-500">Total Price (₹) *</label>
+                        <Input
+                          type="number"
+                          className="h-9 bg-white text-[11px] font-bold"
+                          value={bulkPurchaseForm.totalCost}
+                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-500">Total Bags *</label>
+                        <Input
+                          type="number"
+                          className="h-9 bg-white text-[11px] font-bold"
+                          value={bulkPurchaseForm.totalBags}
+                          onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
+                          required
+                        />
                       </div>
                     </div>
 
-                    {/* Dispatch Table */}
+                    {/* Dispatch Section */}
                     <div className="space-y-3">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-1">2. Farm Wise Dispatch</h3>
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Farm Wise Dispatch</h3>
+                        {Number(bulkPurchaseForm.totalKg) > 0 && Number(bulkPurchaseForm.totalBags) > 0 && (
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">
+                            Avg: {(Number(bulkPurchaseForm.totalKg) / Number(bulkPurchaseForm.totalBags)).toFixed(2)} KG / Bag
+                          </span>
+                        )}
+                      </div>
+
                       <div className="border rounded-lg overflow-hidden">
                         <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 border-b">
                             <tr>
                               <th className="py-2 px-4 font-black uppercase text-[10px]">Location</th>
-                              <th className="py-2 px-4 font-black uppercase text-[10px] w-32">Bags</th>
+                              <th className="py-2 px-4 font-black uppercase text-[10px] w-32">Bags (Primary)</th>
                               <th className="py-2 px-4 font-black uppercase text-[10px] w-48 text-right">Exact KG</th>
                               <th className="py-2 px-4 w-12"></th>
                             </tr>
@@ -661,7 +652,7 @@ export default function InventoryPage() {
                                     <Input
                                       type="number"
                                       placeholder="0"
-                                      className="h-10 font-bold"
+                                      className="h-9 font-bold border-slate-300"
                                       value={dispatch.bags}
                                       onChange={(e) => handleDispatchChange(idx, 'bags', e.target.value)}
                                     />
@@ -672,7 +663,10 @@ export default function InventoryPage() {
                                         type="number"
                                         step="0.1"
                                         placeholder="0.0"
-                                        className={`h-10 w-32 font-black text-right ${dispatch.manualOverride ? 'border-amber-400 bg-amber-50' : ''}`}
+                                        className={cn(
+                                          "h-9 w-32 font-black text-right",
+                                          dispatch.manualOverride ? "border-amber-400 bg-amber-50" : "bg-slate-50 border-slate-200"
+                                        )}
                                         value={dispatch.quantity}
                                         onChange={(e) => handleDispatchChange(idx, 'quantity', e.target.value)}
                                       />
@@ -687,15 +681,18 @@ export default function InventoryPage() {
                                         className="h-6 w-6 p-0 text-amber-600"
                                         onClick={() => {
                                           const newDispatches = [...bulkPurchaseForm.dispatches]
-                                          const autoQty = Number(dispatch.bags) * 50
+                                          const totalKg = Number(bulkPurchaseForm.totalKg || 0)
+                                          const totalBags = Number(bulkPurchaseForm.totalBags || 0)
+                                          const avgKgPerBag = totalBags > 0 ? totalKg / totalBags : 0
+                                          const autoQty = (Number(dispatch.bags) * avgKgPerBag).toFixed(2)
                                           newDispatches[idx] = {
                                             ...dispatch,
-                                            quantity: String(autoQty),
+                                            quantity: autoQty,
                                             manualOverride: false
                                           }
                                           setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
                                         }}
-                                        title="Reset to 50kg per bag"
+                                        title="Reset to calculated weight"
                                       >
                                         <Edit className="h-3 w-3" />
                                       </Button>
@@ -707,10 +704,10 @@ export default function InventoryPage() {
                           </tbody>
                           <tfoot className="bg-slate-900 text-white font-black">
                             <tr>
-                              <td className="py-3 px-4 uppercase text-[10px]">Total Dispatched</td>
-                              <td className="py-3 px-4">{bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.bags || 0), 0)} Bags</td>
-                              <td className="py-3 px-4 text-right">
-                                {bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0).toLocaleString()} KG
+                              <td className="py-2.5 px-4 uppercase text-[10px]">Current Total</td>
+                              <td className="py-2.5 px-4">{bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.bags || 0), 0)} Bags</td>
+                              <td className="py-2.5 px-4 text-right">
+                                {bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG
                               </td>
                               <td></td>
                             </tr>
@@ -719,32 +716,32 @@ export default function InventoryPage() {
                       </div>
                     </div>
 
-                    {/* Summary Footer */}
-                    <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900 text-white p-6 rounded-lg shadow-xl">
-                      <div className="flex gap-8">
-                        <div>
-                          <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Total Lorry Load</p>
-                          <p className="text-3xl font-black tracking-tight">
-                            {Number(bulkPurchaseForm.totalKg || 0).toLocaleString()} <span className="text-sm">KG</span>
-                          </p>
-                        </div>
-                        <div className="border-l border-slate-700 pl-8">
-                          <p className="text-[10px] uppercase text-slate-400 font-black mb-1">Status</p>
-                          <p className={`text-xl font-black tracking-tight ${Math.abs(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) < 0.1 ? 'text-green-400' : 'text-amber-400'}`}>
-                            {Math.abs(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) < 0.1
-                              ? 'READY TO RECORD'
-                              : `NEED ${Math.abs(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)).toLocaleString()} KG MORE`}
+                    {/* Summary & Submit */}
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div className="flex gap-4">
+                        <div className={cn(
+                          "px-4 py-2 rounded border",
+                          Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) < 0.1
+                          ? 'bg-green-50 border-green-200 text-green-700'
+                          : 'bg-amber-50 border-amber-200 text-amber-700'
+                        )}>
+                          <p className="text-[9px] font-black uppercase opacity-70">Weight Variance</p>
+                          <p className="text-sm font-black">
+                            {(Number(bulkPurchaseForm.totalKg || 0) - bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)).toFixed(2)} KG
                           </p>
                         </div>
                       </div>
 
-                      <Button
-                        type="submit"
-                        className="w-full md:w-64 h-16 text-lg font-black uppercase tracking-widest bg-white text-slate-900 hover:bg-slate-200"
-                        disabled={Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) > 0.01}
-                      >
-                        Record Challan
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" type="button" onClick={() => setIsBulkPurchaseDialogOpen(false)} className="font-bold uppercase text-[11px]">Cancel</Button>
+                        <Button
+                          type="submit"
+                          className="font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 px-8"
+                          disabled={Math.abs((bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0)) - Number(bulkPurchaseForm.totalKg || 0)) > 0.1}
+                        >
+                          Confirm & Record Stock
+                        </Button>
+                      </div>
                     </div>
                   </form>
                 </DialogContent>
@@ -893,13 +890,13 @@ export default function InventoryPage() {
 
         <Card className="shadow-sm border-none">
           <CardHeader className="py-1.5 px-3 border-b">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Stock Left</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Low Stock Alerts</span>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className={cn("text-xl font-black tracking-tight", globalDaysLeft < 3 ? "text-red-600" : "text-green-600")}>
-              {globalDaysLeft > 0 ? globalDaysLeft.toFixed(1) : "0.0"} <span className="text-[10px] uppercase">Days</span>
+            <div className={cn("text-xl font-black tracking-tight", lowStockAlertsCount > 0 ? "text-red-600" : "text-green-600")}>
+              {lowStockAlertsCount} <span className="text-[10px] uppercase">Alerts</span>
             </div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Based on 7-day mix avg</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Need urgent refill</p>
           </CardContent>
         </Card>
 
@@ -1017,288 +1014,100 @@ export default function InventoryPage() {
             })}
           </div>
 
-      <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
-        setActiveTabState(value)
-        if (typeof window !== "undefined") {
-          const url = new URL(window.location.href)
-          url.searchParams.set("tab", value)
-          window.history.pushState({}, "", url)
-        }
-      }}>
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
-          <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="purchases">Purchases</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
-          <TabsTrigger value="issues">Issues</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card className="shadow-sm border-none">
-            <CardHeader className="py-3 px-4 border-b">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold">Stock Movement History</CardTitle>
-                  <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Chronological list of all stock ins and outs</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow className="h-10">
-                      <TableHead className="text-[10px] font-extrabold uppercase pl-6 w-32">Date</TableHead>
-                      <TableHead className="text-[10px] font-extrabold uppercase w-32">Type</TableHead>
-                      <TableHead className="text-[10px] font-extrabold uppercase">Farm</TableHead>
-                      <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
-                      <TableHead className="text-[10px] font-extrabold uppercase text-right">Qty (KG)</TableHead>
-                      <TableHead className="text-[10px] font-extrabold uppercase">Reference</TableHead>
-                      <TableHead className="text-[10px] font-extrabold uppercase text-center pr-6">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredHistory.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-10 text-slate-400 italic text-xs">No movement history found.</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredHistory.map((m: any, idx) => {
-                        let farmName = "-"
-                        let itemName = "-"
-                        let reference = "-"
-                        let qtyColor = "text-slate-900"
-
-                        if (m.type === 'purchase') {
-                          const item = items.find(i => i.id === m.itemId)
-                          farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
-                          itemName = item?.name || "-"
-                          reference = m.invoiceNumber ? `Inv: ${m.invoiceNumber}` : "Purchase"
-                          qtyColor = "text-green-600"
-                        } else if (m.type === 'issue') {
-                          const item = items.find(i => i.id === m.itemId)
-                          farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
-                          itemName = item?.name || "-"
-                          reference = m.purpose || "Mix Deduction"
-                          qtyColor = "text-red-600"
-                        } else if (m.type === 'transfer') {
-                          const item = items.find(i => i.id === m.itemId)
-                          const from = farms.find(f => f.id === m.sourceFarmId)?.name || "Unknown"
-                          const to = farms.find(f => f.id === m.destinationFarmId)?.name || "Unknown"
-                          farmName = `${from} → ${to}`
-                          itemName = item?.name || "-"
-                          reference = m.driverNotes || "Transfer"
-                          qtyColor = "text-blue-600"
-                        }
-
-                        return (
-                          <TableRow key={idx} className="h-11 hover:bg-slate-50/50 border-b">
-                            <TableCell className="pl-6 text-[11px] font-bold text-slate-600">{formatIndianDate(m.date)}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className={cn(
-                                "text-[9px] font-black uppercase px-2 py-0 h-5",
-                                m.type === 'purchase' ? "bg-green-50 text-green-700 border-green-200" :
-                                m.type === 'issue' ? "bg-red-50 text-red-700 border-red-200" :
-                                "bg-blue-50 text-blue-700 border-blue-200"
-                              )}>
-                                {m.type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-[11px] font-extrabold text-slate-700">{farmName}</TableCell>
-                            <TableCell className="text-[11px] font-bold text-slate-900">{itemName}</TableCell>
-                            <TableCell className={cn("text-right font-black text-xs", qtyColor)}>
-                              {m.type === 'issue' ? '-' : '+'}{Number(m.quantity).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-[10px] font-medium text-slate-400 italic truncate max-w-[150px]">{reference}</TableCell>
-                            <TableCell className="pr-6">
-                              <div className="flex justify-center gap-1">
-                                {user?.role === "owner" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0 text-red-600"
-                                    onClick={() => {
-                                      if (confirm(`Delete this ${m.type} entry?`)) {
-                                        if (m.type === 'purchase') deletePurchase(m.id)
-                                        // Transfer and Issue deletion might need context support if not already there
-                                        // For now, these are the primary ones.
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="purchases" className="space-y-4">
-          <Card className="shadow-sm border-none">
-            <CardHeader className="py-3 px-4 border-b">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold">Purchase Entries</CardTitle>
-                  <CardDescription className="text-[10px] uppercase font-bold text-slate-400">All bulk purchase transactions</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {purchases.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground italic">No purchases recorded yet.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow className="h-10">
-                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Date</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">Supplier</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Total KG</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Rate</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Amount</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase pr-6">Inv #</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {purchases.map(p => {
-                        const item = getItemById(p.itemId)
-                        const supplier = suppliers.find(s => s.id === p.supplierId)
-                        return (
-                          <TableRow key={p.id}>
-                            <TableCell>{formatIndianDate(p.date)}</TableCell>
-                            <TableCell>{supplier?.name || "-"}</TableCell>
-                            <TableCell>{item?.name || "-"}</TableCell>
-                            <TableCell className="text-right font-bold">{Number(p.quantity).toLocaleString()} KG</TableCell>
-                            <TableCell className="text-right">₹{Number(p.unitRate).toFixed(2)}</TableCell>
-                            <TableCell className="text-right">₹{Number(p.totalAmount).toLocaleString()}</TableCell>
-                            <TableCell className="font-mono text-xs">{p.invoiceNumber || "-"}</TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="transfers" className="space-y-4">
-          <Card className="shadow-sm border-none">
-            <CardHeader className="py-3 px-4 border-b">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold">Stock Transfers</CardTitle>
-                  <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Inter-farm movement history</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setIsTransferDialogOpen(true)} className="h-7 text-[10px] font-bold uppercase">
-                  <Plus className="h-3 w-3 mr-1" />
-                  New Transfer
+      <Card className="shadow-sm border-none mt-4">
+        <CardHeader className="py-3 px-4 border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-bold">Stock Movement Ledger</CardTitle>
+              <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Unified history of purchases, transfers, and daily mixing</CardDescription>
+            </div>
+            <div className="flex gap-2">
+               <Button variant="outline" size="sm" onClick={() => setIsTransferDialogOpen(true)} className="h-7 text-[10px] font-bold uppercase">
+                  <ArrowRightLeft className="h-3 w-3 mr-1" />
+                  Move Stock
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {transfers.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground italic text-xs">No transfers recorded yet.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow className="h-10">
-                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Date</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">From</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">To</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Quantity</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase pr-6">Driver/Notes</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transfers.map(t => {
-                        const item = items.find(i => i.id === t.itemId)
-                        const from = farms.find(f => f.id === t.sourceFarmId)?.name || "Unknown"
-                        const to = farms.find(f => f.id === t.destinationFarmId)?.name || "Unknown"
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="h-10">
+                  <TableHead className="text-[10px] font-extrabold uppercase pl-6 w-28">Date</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase">Farm</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase text-right">Rate</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase text-right">Quantity</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase text-right pr-6">Closing</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredHistory.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-slate-400 italic text-xs">No records found.</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredHistory.map((m: any, idx) => {
+                    let farmName = "-"
+                    let itemName = "-"
+                    let qtyColor = "text-slate-900"
+                    let rateStr = "-"
+                    let closingStock = "-"
+                    let typeLabel = ""
 
-                        return (
-                          <TableRow key={t.id}>
-                            <TableCell>{formatIndianDate(t.date)}</TableCell>
-                            <TableCell className="font-bold">{item?.name || "Deleted Item"}</TableCell>
-                            <TableCell>{from}</TableCell>
-                            <TableCell>{to}</TableCell>
-                            <TableCell className="text-right font-bold">{Number(t.quantity).toLocaleString()} KG</TableCell>
-                            <TableCell className="text-sm italic">{t.driverNotes || "-"}</TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    if (m.type === 'purchase') {
+                      const item = items.find(i => i.id === m.itemId)
+                      farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
+                      itemName = item?.name || "-"
+                      qtyColor = "text-green-600"
+                      rateStr = `₹${Number(m.unitRate).toFixed(2)}`
+                      typeLabel = "Purchase"
+                    } else if (m.type === 'issue') {
+                      const item = items.find(i => i.id === m.itemId)
+                      farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
+                      itemName = item?.name || "-"
+                      qtyColor = "text-red-600"
+                      rateStr = `₹${Number(m.costPerUnit || 0).toFixed(2)}`
+                      typeLabel = "Mix"
+                    } else if (m.type === 'transfer') {
+                      const item = items.find(i => i.id === m.itemId)
+                      const from = farms.find(f => f.id === m.sourceFarmId)?.name || "Unknown"
+                      const to = farms.find(f => f.id === m.destinationFarmId)?.name || "Unknown"
+                      farmName = `${from} → ${to}`
+                      itemName = item?.name || "-"
+                      qtyColor = "text-blue-600"
+                      typeLabel = "Move"
+                    }
 
-        <TabsContent value="issues" className="space-y-4">
-          <Card className="shadow-sm border-none">
-            <CardHeader className="py-3 px-4 border-b">
-              <CardTitle className="text-base font-bold">Issue History</CardTitle>
-              <CardDescription className="text-[10px] uppercase font-bold text-slate-400">{issues.length} total issues recorded</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {issues.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4 text-xs italic">No issues recorded yet</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow className="h-10">
-                        <TableHead className="text-[10px] font-extrabold uppercase pl-6">Date</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">Batch</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Quantity</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase text-right">Total Cost</TableHead>
-                        <TableHead className="text-[10px] font-extrabold uppercase pr-6">Purpose</TableHead>
+                    return (
+                      <TableRow key={idx} className="h-11 hover:bg-slate-50/50 border-b">
+                        <TableCell className="pl-6">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-slate-600">{formatIndianDate(m.date)}</span>
+                            <span className="text-[8px] font-black uppercase text-slate-300 tracking-tighter">{typeLabel}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-[11px] font-extrabold text-slate-700">{farmName}</TableCell>
+                        <TableCell className="text-[11px] font-bold text-slate-900">{itemName}</TableCell>
+                        <TableCell className="text-right text-[10px] font-medium text-slate-500">{rateStr}</TableCell>
+                        <TableCell className={cn("text-right font-black text-xs", qtyColor)}>
+                          {m.type === 'issue' ? '-' : '+'}{Number(m.quantity).toLocaleString()} KG
+                        </TableCell>
+                        <TableCell className="text-right pr-6 text-[11px] font-black text-slate-400">
+                          {/* Closing stock would require complex chronological calculation per item per farm,
+                              showing "-" for now to maintain performance unless strictly needed */}
+                          -
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {issues
-                        .sort((a, b) => b.date.localeCompare(a.date))
-                        .map((issue) => {
-                          const item = getItemById(issue.itemId)
-                          const batch = batches.find((b) => b.id === issue.batchId)
-                          return (
-                            <TableRow key={issue.id}>
-                              <TableCell>{formatIndianDate(issue.date)}</TableCell>
-                              <TableCell>{batch?.batchNumber || "Unknown"}</TableCell>
-                              <TableCell>
-                                {item ? `${item.code} - ${item.name}` : "Item Deleted"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {Number(issue.quantity).toFixed(2)} {item?.unit || ""}
-                              </TableCell>
-                              <TableCell className="text-right font-medium">₹{Number(issue.totalCost).toLocaleString()}</TableCell>
-                              <TableCell>{issue.purpose}</TableCell>
-                            </TableRow>
-                          )
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
         </div>
       </div>
 

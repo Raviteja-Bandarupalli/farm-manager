@@ -289,24 +289,38 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       throw error
     }
-    // Deduct from inventory
+    // Deduct from inventory and record issues for unified ledger
     if (insertPayload.total_feed_mixed > 0) {
       const house = houses.find(h => h.id === insertPayload.houseId)
       const farmId = house?.farmId || null
 
-      const deductions = [
+      const ingredients = [
         { code: "MAIZE", qty: insertPayload.maize_kg },
         { code: "SOYA", qty: insertPayload.soya_kg },
         { code: "BROKENRICE", qty: insertPayload.brokenrice_kg },
         { code: "SUPPL-5", qty: insertPayload.suppl5_kg },
       ]
 
-      for (const ded of deductions) {
-        if (ded.qty > 0) {
-          const item = getItemByCodeAndFarm(ded.code, farmId)
+      for (const ing of ingredients) {
+        if (ing.qty > 0) {
+          const item = getItemByCodeAndFarm(ing.code, farmId)
           if (item) {
+            // Record Issue Entry
+            await supabase.from("issues").insert({
+              id: `issue-${insertPayload.id}-${ing.code}`,
+              date: insertPayload.date,
+              batchId: insertPayload.batchId,
+              itemId: item.id,
+              quantity: ing.qty,
+              costPerUnit: item.averageCost,
+              totalCost: ing.qty * item.averageCost,
+              purpose: `Daily Mix - LogID: ${insertPayload.id}`,
+              createdAt: new Date().toISOString()
+            })
+
+            // Update Stock
             await supabase.from("inventory").update({
-              currentStock: Math.max(0, Number(item.currentStock) - Number(ded.qty))
+              currentStock: Math.max(0, Number(item.currentStock) - Number(ing.qty))
             }).eq("id", item.id)
           }
         }
@@ -338,7 +352,7 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     )
     const final = recalc.find((l) => l.id === id)!
 
-    // Handle inventory adjustments if mixing quantities changed
+    // Handle inventory and issue adjustments if mixing quantities changed
     if (prev.total_feed_mixed !== final.total_feed_mixed ||
         prev.maize_kg !== final.maize_kg ||
         prev.soya_kg !== final.soya_kg ||
@@ -360,6 +374,27 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
         if (diff !== 0) {
           const item = getItemByCodeAndFarm(ing.code, farmId)
           if (item) {
+            const issueId = `issue-${id}-${ing.code}`
+
+            if (ing.next > 0) {
+              // Upsert issue record
+              await supabase.from("issues").upsert({
+                id: issueId,
+                date: final.date,
+                batchId: final.batchId,
+                itemId: item.id,
+                quantity: ing.next,
+                costPerUnit: item.averageCost,
+                totalCost: ing.next * item.averageCost,
+                purpose: `Daily Mix - LogID: ${id}`,
+                createdAt: new Date().toISOString()
+              })
+            } else {
+              // Delete issue record if next is 0
+              await supabase.from("issues").delete().eq("id", issueId)
+            }
+
+            // Update Stock
             await supabase.from("inventory").update({
               currentStock: Math.max(0, Number(item.currentStock) - diff)
             }).eq("id", item.id)
@@ -380,7 +415,7 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     const log = dailyLogs.find((l) => l.id === id)
     if (!log) return
 
-    // Restore inventory if it was a mixing log
+    // Restore inventory and remove issues if it was a mixing log
     if (log.total_feed_mixed > 0) {
       const house = houses.find(h => h.id === log.houseId)
       const farmId = house?.farmId || null
@@ -396,6 +431,10 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
         if (ing.qty > 0) {
           const item = getItemByCodeAndFarm(ing.code, farmId)
           if (item) {
+            // Delete issue record
+            await supabase.from("issues").delete().eq("id", `issue-${id}-${ing.code}`)
+
+            // Restore Stock
             await supabase.from("inventory").update({
               currentStock: Number(item.currentStock) + Number(ing.qty)
             }).eq("id", item.id)
