@@ -189,6 +189,21 @@ CREATE TABLE IF NOT EXISTS batch_sections (
   "workerId" TEXT, "initialBirds" INTEGER NOT NULL, "createdAt" TIMESTAMP DEFAULT NOW()
 );
 ALTER TABLE batch_sections DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS feed_logs (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  "farmId" TEXT NOT NULL REFERENCES farms(id),
+  "totalWeight" DECIMAL(10,2) NOT NULL,
+  "maizeKg" DECIMAL(10,2) NOT NULL,
+  "soyaKg" DECIMAL(10,2) NOT NULL,
+  "brokenRiceKg" DECIMAL(10,2) NOT NULL,
+  "suppl5Kg" DECIMAL(10,2) NOT NULL,
+  "totalCost" DECIMAL(10,2) NOT NULL,
+  distribution JSONB NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE feed_logs DISABLE ROW LEVEL SECURITY;
 \`\`\`
 
 ## Step 2: Verify Tables

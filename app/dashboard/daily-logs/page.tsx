@@ -9,7 +9,6 @@ import { useWorkers } from "@/lib/workers-context"
 import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
 import { useDailyLogs, type DailyLog } from "@/lib/daily-logs-context"
-import { useInventory } from "@/lib/inventory-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -42,7 +41,6 @@ export default function DailyLogsPage() {
   const { getSectionsByBatch, sections } = useBatchSections()
   const { weeklyFeeds, addWeeklyFeed, deleteWeeklyFeed, getFeedsByBatch } = useWeeklyFeed()
   const { dailyLogs, loading, addDailyLog, updateDailyLog, deleteDailyLog, getLastLogForBatch } = useDailyLogs()
-  const { getItemByCodeAndFarm } = useInventory()
   
   // Check for fetch errors on mount
   useEffect(() => {
@@ -65,10 +63,6 @@ export default function DailyLogsPage() {
     houseId: "",
     date: getTodayDate(),
     mortality: "",
-    maize_kg: "0",
-    soya_kg: "0",
-    brokenrice_kg: "0",
-    suppl5_kg: "0",
     temperature: "",
     humidity: "",
     remarks: "",
@@ -143,12 +137,6 @@ export default function DailyLogsPage() {
   const batchWorkers = selectedBatch?.workerIds ? getWorkersByIds(selectedBatch.workerIds) : []
 
   const totalMortality = Object.values(mortalityBySection).reduce((sum, value) => sum + (value || 0), 0)
-  const totalMixedWeight =
-    Number(formData.maize_kg || 0) +
-    Number(formData.soya_kg || 0) +
-    Number(formData.brokenrice_kg || 0) +
-    Number(formData.suppl5_kg || 0)
-
   // Use section mortality if sections exist, otherwise use formData.mortality
   const finalMortality = batchSections.length > 0 
     ? totalMortality 
@@ -188,11 +176,6 @@ export default function DailyLogsPage() {
           date: formData.date,
           mortality: finalMortality,
           sectionMortality: sectionMortalityData,
-          maize_kg: Number(formData.maize_kg),
-          soya_kg: Number(formData.soya_kg),
-          brokenrice_kg: Number(formData.brokenrice_kg),
-          suppl5_kg: Number(formData.suppl5_kg),
-          total_feed_mixed: totalMixedWeight,
           temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
           humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
           remarks: formData.remarks,
@@ -205,11 +188,6 @@ export default function DailyLogsPage() {
           date: formData.date,
           mortality: finalMortality,
           sectionMortality: sectionMortalityData,
-          maize_kg: Number(formData.maize_kg),
-          soya_kg: Number(formData.soya_kg),
-          brokenrice_kg: Number(formData.brokenrice_kg),
-          suppl5_kg: Number(formData.suppl5_kg),
-          total_feed_mixed: totalMixedWeight,
           temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
           humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
           remarks: formData.remarks,
@@ -277,9 +255,6 @@ export default function DailyLogsPage() {
   }
 
   const handleEdit = (log: DailyLog) => {
-    console.log("[v0] Edit clicked for log:", log)
-    console.log("[v0] Log sectionMortality:", log.sectionMortality)
-
     const batch = batches.find((b) => b.id === log.batchId)
     setEditBatchId(log.batchId)
     setEditingLog(log.id)
@@ -287,10 +262,6 @@ export default function DailyLogsPage() {
       houseId: log.houseId,
       date: log.date,
       mortality: log.mortality.toString(),
-      maize_kg: log.maize_kg?.toString() || "0",
-      soya_kg: log.soya_kg?.toString() || "0",
-      brokenrice_kg: log.brokenrice_kg?.toString() || "0",
-      suppl5_kg: log.suppl5_kg?.toString() || "0",
       temperature: log.temperature?.toString() || "",
       humidity: log.humidity?.toString() || "",
       remarks: log.remarks || "",
@@ -342,30 +313,6 @@ export default function DailyLogsPage() {
     return allFarms.find((f) => f.id === house.farmId)?.name || "Unknown Farm"
   }
 
-  // Calculate 7-day average mixing for alerts
-  const getAverageDailyMixing = (farmId: string | null, code: string) => {
-    const last7Days = new Date()
-    last7Days.setDate(last7Days.getDate() - 7)
-    const dateStr = last7Days.toISOString().split('T')[0]
-
-    const farmHouses = allHouses.filter(h => h.farmId === farmId).map(h => h.id)
-    const logs = dailyLogs.filter(l => {
-      if (l.date < dateStr) return false
-      return farmHouses.includes(l.houseId)
-    })
-
-    if (logs.length === 0) return 0
-
-    let total = 0
-    logs.forEach(l => {
-      if (code === "MAIZE") total += Number(l.maize_kg || 0)
-      if (code === "SOYA") total += Number(l.soya_kg || 0)
-      if (code === "BROKENRICE") total += Number(l.brokenrice_kg || 0)
-      if (code === "SUPPL-5") total += Number(l.suppl5_kg || 0)
-    })
-
-    return total / 7
-  }
 
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
@@ -690,51 +637,6 @@ export default function DailyLogsPage() {
                     </div>
                   )}
 
-                  <Card>
-                    <CardHeader className="py-2 px-4 border-b">
-                      <CardTitle className="text-sm font-bold uppercase tracking-wider">Daily Mixing (KG)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        {[
-                          { id: "maize_kg", label: "Maize", code: "MAIZE" },
-                          { id: "soya_kg", label: "Soya", code: "SOYA" },
-                          { id: "brokenrice_kg", label: "Broken Rice", code: "BROKENRICE" },
-                          { id: "suppl5_kg", label: "5% Suppl.", code: "SUPPL-5" },
-                        ].map((item) => {
-                          const house = houses.find(h => h.id === formData.houseId)
-                          const farmId = house?.farmId || null
-                          const invItem = getItemByCodeAndFarm(item.code, farmId)
-                          const stock = invItem ? Number(invItem.currentStock) : 0
-
-                          const avgDaily = getAverageDailyMixing(farmId, item.code)
-                          const daysLeft = avgDaily > 0 ? stock / avgDaily : 99
-                          const isLow = daysLeft < 3
-
-                          return (
-                            <div key={item.id} className="space-y-1">
-                              <label className="text-[10px] font-black uppercase text-slate-500 flex justify-between">
-                                {item.label}
-                                <span className={isLow ? 'text-red-600 animate-pulse' : 'text-slate-400'}>Stock: {stock.toLocaleString()}</span>
-                              </label>
-                              <Input
-                                type="number"
-                                className="h-10 font-bold"
-                                value={(formData as any)[item.id]}
-                                onChange={(e) => setFormData({ ...formData, [item.id]: e.target.value })}
-                                onWheel={(e) => e.currentTarget.blur()}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      <div className="pt-2 mt-2 border-t flex justify-between items-center">
-                        <span className="text-[10px] font-black uppercase text-slate-500">Total Mixed Weight</span>
-                        <span className="text-lg font-black text-blue-700">{totalMixedWeight.toLocaleString()} KG</span>
-                      </div>
-                    </CardContent>
-                  </Card>
 
 
                   <div className="grid grid-cols-2 gap-4">
@@ -885,7 +787,6 @@ export default function DailyLogsPage() {
                   <TableHead>Farm</TableHead>
                   <TableHead>House</TableHead>
                   <TableHead>Mortality</TableHead>
-                  <TableHead>Daily Mix</TableHead>
                   <TableHead>Closing Birds</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
@@ -904,9 +805,6 @@ export default function DailyLogsPage() {
                       <TableCell>{getFarmName(log.houseId)}</TableCell>
                       <TableCell>{getHouseName(log.houseId)}</TableCell>
                       <TableCell>{log.mortality}</TableCell>
-                      <TableCell>
-                        <span className="font-bold text-blue-700">{Number(log.total_feed_mixed || 0).toLocaleString()} kg</span>
-                      </TableCell>
                       <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">

@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory, CORE_INGREDIENTS } from "@/lib/inventory-context"
 import { useDailyLogs } from "@/lib/daily-logs-context"
+import { useFeedLogs } from "@/lib/feed-logs-context"
 import { formatIndianDate, cn } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -49,6 +50,7 @@ export default function InventoryPage() {
   } = useInventory()
 
   const { dailyLogs } = useDailyLogs()
+  const { feedLogs } = useFeedLogs()
   const [selectedFarmId, setSelectedFarmId] = useState<string | null>(null)
 
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
@@ -188,6 +190,44 @@ export default function InventoryPage() {
   const displayMaize = filteredItems.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
   const displaySoya = filteredItems.filter(i => i.code === "SOYA").reduce((sum, i) => sum + Number(i.currentStock), 0)
   const displayBrokenRice = filteredItems.filter(i => i.code === "BROKENRICE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+
+  // Calculate 7-day average mixing for alerts
+  const getAverageDailyMixing = (farmId: string | null, code: string) => {
+    const last7Days = new Date()
+    last7Days.setDate(last7Days.getDate() - 7)
+    const dateStr = last7Days.toISOString().split('T')[0]
+
+    const logs = feedLogs.filter(l => (farmId ? l.farmId === farmId : true) && l.date >= dateStr)
+    if (logs.length === 0) return 0
+
+    let total = 0
+    logs.forEach(l => {
+      if (code === "MAIZE") total += Number(l.maizeKg || 0)
+      if (code === "SOYA") total += Number(l.soyaKg || 0)
+      if (code === "BROKENRICE") total += Number(l.brokenRiceKg || 0)
+      if (code === "SUPPL-5") total += Number(l.suppl5Kg || 0)
+    })
+
+    return total / 7
+  }
+
+  const getDaysLeft = (farmId: string | null) => {
+    const ingredients = ["MAIZE", "SOYA", "BROKENRICE"]
+    let minDays = 99
+
+    ingredients.forEach(code => {
+      const stock = filteredItems.filter(i => i.code === code).reduce((sum, i) => sum + Number(i.currentStock), 0)
+      const avg = getAverageDailyMixing(farmId, code)
+      if (avg > 0) {
+        const days = stock / avg
+        if (days < minDays) minDays = days
+      }
+    })
+
+    return minDays === 99 ? "-" : Math.floor(minDays).toString()
+  }
+
+  const daysLeft = getDaysLeft(selectedFarmId)
 
   const movementHistory = [
     ...purchases.map(p => ({ ...p, type: 'purchase' as const })),
@@ -543,11 +583,13 @@ export default function InventoryPage() {
         </Card>
         <Card className="shadow-sm border-none">
           <CardHeader className="py-1.5 px-3 border-b">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Broken Rice</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Stock Left</span>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className="text-xl font-black tracking-tight text-slate-900">{displayBrokenRice.toLocaleString()} <span className="text-xs">KG</span></div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(displayBrokenRice / 50).toFixed(0)} Bags</p>
+            <div className={cn("text-xl font-black tracking-tight", Number(daysLeft) < 3 ? "text-red-600 animate-pulse" : "text-slate-900")}>
+              {daysLeft} <span className="text-xs">DAYS</span>
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Based on 7-day mix avg</p>
           </CardContent>
         </Card>
       </div>

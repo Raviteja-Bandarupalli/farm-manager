@@ -9,6 +9,7 @@ import { useBatch } from "./batch-context"
 import { useWeeklyFeed } from "./weekly-feed-context"
 import { useInventory } from "./inventory-context"
 import { useMasterData } from "./master-data-context"
+import { useFeedLogs, type FeedLog } from "./feed-logs-context"
 
 export interface DailyLog {
   id: string
@@ -21,12 +22,6 @@ export interface DailyLog {
   mortality: number
   closingBirds: number
   feedTypeId: string
-  // Mixing fields
-  maize_kg: number
-  soya_kg: number
-  brokenrice_kg: number
-  suppl5_kg: number
-  total_feed_mixed: number
 
   cumulativeMortality: number
   cumulativeFeed: number
@@ -67,11 +62,13 @@ const DailyLogsContext = createContext<DailyLogsContextType | undefined>(undefin
 function recalculateBatchLogs(
   batchId: string,
   allLogs: DailyLog[],
-  batches: { id: string; initialBirds: number }[],
+  batches: { id: string; name: string; initialBirds: number; placementDate: string }[],
   weeklyFeeds: { batchId: string; weekEnd: string; totalFeedKg: number; averageWeightKg: number }[],
+  feedLogs: FeedLog[],
 ): DailyLog[] {
   const batch = batches.find((b) => b.id === batchId)
   const initialBirds = batch?.initialBirds ?? 0
+  const placementDate = batch?.placementDate || "0000-00-00"
   const batchLogs = allLogs
     .filter((l) => l.batchId === batchId)
     .sort((a, b) => {
@@ -86,14 +83,14 @@ function recalculateBatchLogs(
     const closingBirds = openingBirds - cur.mortality
     const cumulativeMortality = i === 0 ? cur.mortality : out[i - 1].cumulativeMortality + cur.mortality
 
-    // Calculate cumulative feed: Sum of all daily mix entries + any legacy weekly feed entries
+    // Calculate cumulative feed: Sum of all daily mix entries from feed_logs + any weekly feed entries
     const weeklyFeedSum = weeklyFeeds
       .filter((f) => f.batchId === batchId && f.weekEnd <= cur.date)
       .reduce((s, f) => s + Number(f.totalFeedKg), 0)
 
-    const dailyMixSum = batchLogs
-      .slice(0, i + 1)
-      .reduce((s, l) => s + Number(l.total_feed_mixed || 0), 0)
+    const dailyMixSum = feedLogs
+      .filter(fl => fl.date >= placementDate && fl.date <= cur.date && fl.distribution && fl.distribution[cur.houseId])
+      .reduce((s, fl) => s + Number(fl.distribution[cur.houseId] || 0), 0)
 
     const cumulativeFeed = dailyMixSum + weeklyFeedSum
     const cumulativeMortalityPercent = initialBirds > 0 ? (cumulativeMortality / initialBirds) * 100 : 0
@@ -125,6 +122,7 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const { batches } = useBatch()
   const { weeklyFeeds } = useWeeklyFeed()
+  const { feedLogs } = useFeedLogs()
   const { items, getItemByCodeAndFarm, refetch: refetchInventory } = useInventory()
   const { houses } = useMasterData()
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([])
@@ -191,13 +189,14 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     const recalc = recalculateBatchLogs(
       log.batchId,
       allLogs,
-      batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
+      batches.map((b) => ({ id: b.id, name: b.name, initialBirds: b.initialBirds, placementDate: b.placementDate })),
       weeklyFeeds.map((f) => ({
         batchId: f.batchId,
         weekEnd: f.weekEnd,
         totalFeedKg: f.totalFeedKg,
         averageWeightKg: f.averageWeightKg
       })),
+      feedLogs,
     )
     const saved = recalc.find((l) => l.id === logId)
     if (!saved) throw new Error("Failed to recalculate daily log")
@@ -225,11 +224,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       mortality: Number(saved.mortality),
       closingBirds: Number(saved.closingBirds),
       feedTypeId: saved.feedTypeId ? String(saved.feedTypeId) : null,
-      maize_kg: Number(saved.maize_kg || 0),
-      soya_kg: Number(saved.soya_kg || 0),
-      brokenrice_kg: Number(saved.brokenrice_kg || 0),
-      suppl5_kg: Number(saved.suppl5_kg || 0),
-      total_feed_mixed: Number(saved.total_feed_mixed || 0),
       cumulativeMortality: Number(saved.cumulativeMortality),
       cumulativeFeed: Number(saved.cumulativeFeed),
       cumulativeMortalityPercent: Number(saved.cumulativeMortalityPercent),
@@ -264,11 +258,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       mortality: Number(row.mortality),
       closingBirds: Number(row.closingBirds),
       feedTypeId: row.feedTypeId ? String(row.feedTypeId) : null,
-      maize_kg: Number(row.maize_kg || 0),
-      soya_kg: Number(row.soya_kg || 0),
-      brokenrice_kg: Number(row.brokenrice_kg || 0),
-      suppl5_kg: Number(row.suppl5_kg || 0),
-      total_feed_mixed: Number(row.total_feed_mixed || 0),
       cumulativeMortality: Number(row.cumulativeMortality),
       cumulativeFeed: Number(row.cumulativeFeed),
       cumulativeMortalityPercent: Number(row.cumulativeMortalityPercent),
@@ -289,44 +278,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       throw error
     }
-    // Deduct from inventory and record issues for unified ledger
-    if (insertPayload.total_feed_mixed > 0) {
-      const house = houses.find(h => h.id === insertPayload.houseId)
-      const farmId = house?.farmId || null
-
-      const ingredients = [
-        { code: "MAIZE", qty: insertPayload.maize_kg },
-        { code: "SOYA", qty: insertPayload.soya_kg },
-        { code: "BROKENRICE", qty: insertPayload.brokenrice_kg },
-        { code: "SUPPL-5", qty: insertPayload.suppl5_kg },
-      ]
-
-      for (const ing of ingredients) {
-        if (ing.qty > 0) {
-          const item = getItemByCodeAndFarm(ing.code, farmId)
-          if (item) {
-            // Record Issue Entry
-            await supabase.from("issues").insert({
-              id: `issue-${insertPayload.id}-${ing.code}`,
-              date: insertPayload.date,
-              batchId: insertPayload.batchId,
-              itemId: item.id,
-              quantity: ing.qty,
-              costPerUnit: item.averageCost,
-              totalCost: ing.qty * item.averageCost,
-              purpose: `Daily Mix - LogID: ${insertPayload.id}`,
-              createdAt: new Date().toISOString()
-            })
-
-            // Update Stock
-            await supabase.from("inventory").update({
-              currentStock: Math.max(0, Number(item.currentStock) - Number(ing.qty))
-            }).eq("id", item.id)
-          }
-        }
-      }
-      await refetchInventory()
-    }
 
     await fetchLogs()
     return saved
@@ -342,67 +293,16 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     const recalc = recalculateBatchLogs(
       updated.batchId,
       allLogs,
-      batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
+      batches.map((b) => ({ id: b.id, name: b.name, initialBirds: b.initialBirds, placementDate: b.placementDate })),
       weeklyFeeds.map((f) => ({
         batchId: f.batchId,
         weekEnd: f.weekEnd,
         totalFeedKg: f.totalFeedKg,
         averageWeightKg: f.averageWeightKg
       })),
+      feedLogs,
     )
     const final = recalc.find((l) => l.id === id)!
-
-    // Handle inventory and issue adjustments if mixing quantities changed
-    if (prev.total_feed_mixed !== final.total_feed_mixed ||
-        prev.maize_kg !== final.maize_kg ||
-        prev.soya_kg !== final.soya_kg ||
-        prev.brokenrice_kg !== final.brokenrice_kg ||
-        prev.suppl5_kg !== final.suppl5_kg) {
-
-      const house = houses.find(h => h.id === final.houseId)
-      const farmId = house?.farmId || null
-
-      const ingredients = [
-        { code: "MAIZE", prev: prev.maize_kg, next: final.maize_kg },
-        { code: "SOYA", prev: prev.soya_kg, next: final.soya_kg },
-        { code: "BROKENRICE", prev: prev.brokenrice_kg, next: final.brokenrice_kg },
-        { code: "SUPPL-5", prev: prev.suppl5_kg, next: final.suppl5_kg },
-      ]
-
-      for (const ing of ingredients) {
-        const diff = Number(ing.next || 0) - Number(ing.prev || 0)
-        if (diff !== 0) {
-          const item = getItemByCodeAndFarm(ing.code, farmId)
-          if (item) {
-            const issueId = `issue-${id}-${ing.code}`
-
-            if (ing.next > 0) {
-              // Upsert issue record
-              await supabase.from("issues").upsert({
-                id: issueId,
-                date: final.date,
-                batchId: final.batchId,
-                itemId: item.id,
-                quantity: ing.next,
-                costPerUnit: item.averageCost,
-                totalCost: ing.next * item.averageCost,
-                purpose: `Daily Mix - LogID: ${id}`,
-                createdAt: new Date().toISOString()
-              })
-            } else {
-              // Delete issue record if next is 0
-              await supabase.from("issues").delete().eq("id", issueId)
-            }
-
-            // Update Stock
-            await supabase.from("inventory").update({
-              currentStock: Math.max(0, Number(item.currentStock) - diff)
-            }).eq("id", item.id)
-          }
-        }
-      }
-      await refetchInventory()
-    }
 
     const row = { ...final, sectionMortality: final.sectionMortality ? JSON.stringify(final.sectionMortality) : null }
     const { error } = await supabase.from("daily_logs").update(row).eq("id", id)
@@ -415,48 +315,20 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
     const log = dailyLogs.find((l) => l.id === id)
     if (!log) return
 
-    // Restore inventory and remove issues if it was a mixing log
-    if (log.total_feed_mixed > 0) {
-      const house = houses.find(h => h.id === log.houseId)
-      const farmId = house?.farmId || null
-
-      const ingredients = [
-        { code: "MAIZE", qty: log.maize_kg },
-        { code: "SOYA", qty: log.soya_kg },
-        { code: "BROKENRICE", qty: log.brokenrice_kg },
-        { code: "SUPPL-5", qty: log.suppl5_kg },
-      ]
-
-      for (const ing of ingredients) {
-        if (ing.qty > 0) {
-          const item = getItemByCodeAndFarm(ing.code, farmId)
-          if (item) {
-            // Delete issue record
-            await supabase.from("issues").delete().eq("id", `issue-${id}-${ing.code}`)
-
-            // Restore Stock
-            await supabase.from("inventory").update({
-              currentStock: Number(item.currentStock) + Number(ing.qty)
-            }).eq("id", item.id)
-          }
-        }
-      }
-      await refetchInventory()
-    }
-
     const { error } = await supabase.from("daily_logs").delete().eq("id", id)
     if (error) throw error
     const remaining = dailyLogs.filter((l) => l.id !== id)
     const recalc = recalculateBatchLogs(
       log.batchId,
       remaining,
-      batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
+      batches.map((b) => ({ id: b.id, name: b.name, initialBirds: b.initialBirds, placementDate: b.placementDate })),
       weeklyFeeds.map((f) => ({
         batchId: f.batchId,
         weekEnd: f.weekEnd,
         totalFeedKg: f.totalFeedKg,
         averageWeightKg: f.averageWeightKg
       })),
+      feedLogs,
     )
     for (const r of recalc) {
       const row = { ...r, sectionMortality: r.sectionMortality ? JSON.stringify(r.sectionMortality) : null }
