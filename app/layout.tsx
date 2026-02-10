@@ -7,6 +7,7 @@ import { MasterDataProvider } from "@/lib/master-data-context"
 import { BatchProvider } from "@/lib/batch-context"
 import { DailyLogsProvider } from "@/lib/daily-logs-context"
 import { InventoryProvider } from "@/lib/inventory-context"
+import { FeedLogsProvider } from "@/lib/feed-logs-context"
 import { FinanceProvider } from "@/lib/finance-context"
 import { BatchCostingProvider } from "@/lib/batch-costing-context"
 import { WorkersProvider } from "@/lib/workers-context"
@@ -51,21 +52,23 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <AuthProvider>
           <MasterDataProvider>
-            <WorkersProvider>
-              <BatchProvider>
-                <BatchSectionsProvider>
-                  <WeeklyFeedProvider>
-                    <DailyLogsProvider>
+            <FinanceProvider>
+              <WorkersProvider>
+                <BatchProvider>
+                  <BatchSectionsProvider>
+                    <WeeklyFeedProvider>
                       <InventoryProvider>
-                        <BatchCostingProvider>
-                          <FinanceProvider>{children}</FinanceProvider>
-                        </BatchCostingProvider>
+                        <FeedLogsProvider>
+                          <DailyLogsProvider>
+                            <BatchCostingProvider>{children}</BatchCostingProvider>
+                          </DailyLogsProvider>
+                        </FeedLogsProvider>
                       </InventoryProvider>
-                    </DailyLogsProvider>
-                  </WeeklyFeedProvider>
-                </BatchSectionsProvider>
-              </BatchProvider>
-            </WorkersProvider>
+                    </WeeklyFeedProvider>
+                  </BatchSectionsProvider>
+                </BatchProvider>
+              </WorkersProvider>
+            </FinanceProvider>
           </MasterDataProvider>
         </AuthProvider>
         <Analytics />

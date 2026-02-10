@@ -34,7 +34,7 @@ interface MortalityBySection {
 }
 
 export default function DailyLogsPage() {
-  const { houses: allHouses, farms: allFarms, feedTypes } = useMasterData()
+  const { houses: allHouses, farms: allFarms } = useMasterData()
   const { batches, getActiveBatchByHouse } = useBatch()
   const { user } = useAuth()
   const { getWorkersByIds, getWorkerById } = useWorkers()
@@ -63,7 +63,6 @@ export default function DailyLogsPage() {
     houseId: "",
     date: getTodayDate(),
     mortality: "",
-    feedTypeId: "",
     temperature: "",
     humidity: "",
     remarks: "",
@@ -138,7 +137,6 @@ export default function DailyLogsPage() {
   const batchWorkers = selectedBatch?.workerIds ? getWorkersByIds(selectedBatch.workerIds) : []
 
   const totalMortality = Object.values(mortalityBySection).reduce((sum, value) => sum + (value || 0), 0)
-  
   // Use section mortality if sections exist, otherwise use formData.mortality
   const finalMortality = batchSections.length > 0 
     ? totalMortality 
@@ -178,7 +176,6 @@ export default function DailyLogsPage() {
           date: formData.date,
           mortality: finalMortality,
           sectionMortality: sectionMortalityData,
-          feedTypeId: formData.feedTypeId,
           temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
           humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
           remarks: formData.remarks,
@@ -191,7 +188,6 @@ export default function DailyLogsPage() {
           date: formData.date,
           mortality: finalMortality,
           sectionMortality: sectionMortalityData,
-          feedTypeId: formData.feedTypeId,
           temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
           humidity: formData.humidity ? Number.parseFloat(formData.humidity) : undefined,
           remarks: formData.remarks,
@@ -202,7 +198,10 @@ export default function DailyLogsPage() {
         houseId: "",
         date: getTodayDate(),
         mortality: "",
-        feedTypeId: "",
+        maize_kg: "0",
+        soya_kg: "0",
+        brokenrice_kg: "0",
+        suppl5_kg: "0",
         temperature: "",
         humidity: "",
         remarks: "",
@@ -256,9 +255,6 @@ export default function DailyLogsPage() {
   }
 
   const handleEdit = (log: DailyLog) => {
-    console.log("[v0] Edit clicked for log:", log)
-    console.log("[v0] Log sectionMortality:", log.sectionMortality)
-
     const batch = batches.find((b) => b.id === log.batchId)
     setEditBatchId(log.batchId)
     setEditingLog(log.id)
@@ -266,7 +262,6 @@ export default function DailyLogsPage() {
       houseId: log.houseId,
       date: log.date,
       mortality: log.mortality.toString(),
-      feedTypeId: log.feedTypeId || "",
       temperature: log.temperature?.toString() || "",
       humidity: log.humidity?.toString() || "",
       remarks: log.remarks || "",
@@ -318,9 +313,7 @@ export default function DailyLogsPage() {
     return allFarms.find((f) => f.id === house.farmId)?.name || "Unknown Farm"
   }
 
-  const getFeedTypeName = (feedTypeId: string) => {
-    return feedTypes.find((f) => f.id === feedTypeId)?.name || "Unknown Feed"
-  }
+
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
   const accessibleLogs = filteredLogs.filter((log) => {
@@ -337,7 +330,10 @@ export default function DailyLogsPage() {
       houseId: "",
       date: getTodayDate(),
       mortality: "",
-      feedTypeId: "",
+      maize_kg: "0",
+      soya_kg: "0",
+      brokenrice_kg: "0",
+      suppl5_kg: "0",
       temperature: "",
       humidity: "",
       remarks: "",
@@ -641,26 +637,7 @@ export default function DailyLogsPage() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Feed Type *</label>
-                    <Select
-                      value={formData.feedTypeId}
-                      onValueChange={(value) => setFormData({ ...formData, feedTypeId: value })}
-                      required
-                    >
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="Select feed type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {feedTypes.map((type) => (
-                          <SelectItem key={type.id} value={type.id}>
-                            {type.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Used for record keeping only</p>
-                  </div>
+
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -810,7 +787,6 @@ export default function DailyLogsPage() {
                   <TableHead>Farm</TableHead>
                   <TableHead>House</TableHead>
                   <TableHead>Mortality</TableHead>
-                  <TableHead>Feed Type</TableHead>
                   <TableHead>Closing Birds</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
@@ -829,7 +805,6 @@ export default function DailyLogsPage() {
                       <TableCell>{getFarmName(log.houseId)}</TableCell>
                       <TableCell>{getHouseName(log.houseId)}</TableCell>
                       <TableCell>{log.mortality}</TableCell>
-                      <TableCell>{getFeedTypeName(log.feedTypeId)}</TableCell>
                       <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">

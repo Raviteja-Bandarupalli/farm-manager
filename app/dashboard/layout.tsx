@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { LayoutDashboard, Database, ClipboardList, Package, DollarSign, Wallet, LogOut, Menu } from "lucide-react"
+import { LayoutDashboard, Database, ClipboardList, Package, DollarSign, Wallet, LogOut, Menu, Utensils } from "lucide-react"
 import { useState } from "react"
 import { canAccessMasterData, canAccessInventory, canAccessFinance } from "@/lib/permissions"
 import { cn } from "@/lib/utils"
@@ -43,6 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", show: true },
     { icon: Database, label: "Master Data", href: "/dashboard/master-data", show: canAccessMasterData(user) },
     { icon: ClipboardList, label: "Daily Logs", href: "/dashboard/daily-logs", show: true },
+    { icon: Utensils, label: "Daily Feed Log", href: "/dashboard/feed-logs", show: true },
     { icon: Package, label: "Inventory", href: "/dashboard/inventory", show: canAccessInventory(user) },
     { icon: Wallet, label: "Sales", href: "/dashboard/sales", show: true },
     { icon: DollarSign, label: "Finance", href: "/dashboard/finance", show: canAccessFinance(user) },
