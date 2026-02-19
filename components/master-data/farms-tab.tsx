@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog"
 
 export function FarmsTab() {
-  const { farms, addFarm, updateFarm, deleteFarm } = useMasterData()
+  const { farms, houses, addFarm, updateFarm, deleteFarm } = useMasterData()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", location: "", capacity: "" })
@@ -41,9 +41,31 @@ export function FarmsTab() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this farm?")) {
-      deleteFarm(id)
+  const handleDelete = async (id: string) => {
+    // Check for associated houses
+    const farmHouses = houses.filter((h) => h.farmId === id)
+    if (farmHouses.length > 0) {
+      alert(
+        `Cannot delete farm "${farms.find((f) => f.id === id)?.name}" because it has ${
+          farmHouses.length
+        } houses associated with it.\n\nPlease delete the houses first if you really want to remove this farm.`,
+      )
+      return
+    }
+
+    if (
+      confirm(
+        "Are you sure you want to delete this farm? This will remove the farm permanently if it has no other dependencies.",
+      )
+    ) {
+      try {
+        await deleteFarm(id)
+      } catch (err: any) {
+        console.error("Delete farm error:", err)
+        alert(
+          "Unable to delete farm. It likely has other associated records like financial transactions or inventory. In such cases, deletion is blocked to preserve data integrity.",
+        )
+      }
     }
   }
 

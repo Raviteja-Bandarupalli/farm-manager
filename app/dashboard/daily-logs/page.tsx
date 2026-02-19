@@ -83,6 +83,7 @@ export default function DailyLogsPage() {
 
   const farms = filterVisibleFarms(user, allFarms)
   const houses = filterVisibleHouses(user, allHouses, allFarms)
+  const activeHouses = houses.filter((house) => !!getActiveBatchByHouse(house.id))
 
   const selectedBatch =
     editingLog && editBatchId
@@ -380,14 +381,17 @@ export default function DailyLogsPage() {
                         <SelectValue placeholder="Select a house" />
                       </SelectTrigger>
                       <SelectContent>
-                        {houses.map((house) => {
-                          const activeBatch = getActiveBatchByHouse(house.id)
-                          return (
-                            <SelectItem key={house.id} value={house.id} disabled={!activeBatch}>
-                              {house.name} - {getFarmName(house.id)} {!activeBatch && "(No active batch)"}
+                        {activeHouses.length === 0 ? (
+                          <SelectItem value="none" disabled>
+                            No houses with active batches
+                          </SelectItem>
+                        ) : (
+                          activeHouses.map((house) => (
+                            <SelectItem key={house.id} value={house.id}>
+                              {house.name} - {getFarmName(house.id)}
                             </SelectItem>
-                          )
-                        })}
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -497,19 +501,16 @@ export default function DailyLogsPage() {
                         <SelectValue placeholder="Select a house" />
                       </SelectTrigger>
                       <SelectContent>
-                        {houses.length === 0 ? (
+                        {activeHouses.length === 0 ? (
                           <SelectItem value="none" disabled>
-                            No houses available - Please create houses in Master Data
+                            No houses with active batches
                           </SelectItem>
                         ) : (
-                          houses.map((house) => {
-                            const activeBatch = getActiveBatchByHouse(house.id)
-                            return (
-                              <SelectItem key={house.id} value={house.id} disabled={!activeBatch}>
-                                {house.name} - {getFarmName(house.id)} {!activeBatch && "(No active batch)"}
-                              </SelectItem>
-                            )
-                          })
+                          activeHouses.map((house) => (
+                            <SelectItem key={house.id} value={house.id}>
+                              {house.name} - {getFarmName(house.id)}
+                            </SelectItem>
+                          ))
                         )}
                       </SelectContent>
                     </Select>
@@ -785,7 +786,7 @@ export default function DailyLogsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Houses</SelectItem>
-                {houses.map((house) => (
+                {activeHouses.map((house) => (
                   <SelectItem key={house.id} value={house.id}>
                     {house.name} - {getFarmName(house.id)}
                   </SelectItem>
