@@ -1,7 +1,7 @@
 "use client"
 
 import { useBatch } from "@/lib/batch-context"
-import { useDailyLogs } from "@/lib/daily-logs-context"
+import { useDailyLogs, toDateKey } from "@/lib/daily-logs-context"
 import { useMasterData } from "@/lib/master-data-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
@@ -29,7 +29,7 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
   const { getFeedsByBatch, getTotalFeedForBatch, getLatestWeightForBatch } = useWeeklyFeed()
 
   const batch = batches.find((b) => b.id === id)
-  const batchLogs = dailyLogs.filter((log) => log.batchId === id).sort((a, b) => a.date.localeCompare(b.date))
+  const batchLogs = dailyLogs.filter((log) => log.batchId === id).sort((a, b) => toDateKey(a.date) - toDateKey(b.date))
 
   const weeklyFeeds = batch ? getFeedsByBatch(batch.id) : []
   const totalFeedUsed = batch ? getTotalFeedForBatch(batch.id) : 0
@@ -74,8 +74,8 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
   const batchWorkers = batch?.workerIds ? getWorkersByIds(batch.workerIds) : []
 
   const currentDate = new Date()
-  const placementDate = new Date(batch.placementDate)
-  const ageInDays = Math.ceil((currentDate.getTime() - placementDate.getTime()) / (1000 * 60 * 60 * 24))
+  const placementDateTime = toDateKey(batch.placementDate)
+  const ageInDays = Math.ceil((currentDate.getTime() - placementDateTime) / (1000 * 60 * 60 * 24))
 
   const latestLog = batchLogs[batchLogs.length - 1]
   const currentBirds = latestLog?.closingBirds || batch.initialBirds
@@ -96,158 +96,89 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
   }))
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button asChild variant="outline" size="sm">
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Button asChild variant="outline" size="sm" className="h-8 px-2 text-[10px] font-bold bg-white shadow-sm border-slate-200">
           <Link href="/dashboard/daily-logs">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-3 w-3 mr-1" />
             Back
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Batch: {batch.name}</h1>
-          <p className="text-muted-foreground">
-            {house?.name} - {farm?.name}
+          <h1 className="text-xl font-black tracking-tight leading-none">Batch: {batch.name}</h1>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight mt-0.5">
+            {house?.name} • {farm?.name}
+            {batchWorkers.length > 0 && (
+              <span className="ml-1.5 opacity-70">| Workers: {batchWorkers.map((w) => w.name).join(", ")}</span>
+            )}
           </p>
-          {batchWorkers.length > 0 && (
-            <p className="text-sm text-muted-foreground mt-1">Workers: {batchWorkers.map((w) => w.name).join(", ")}</p>
-          )}
         </div>
       </div>
 
-      <Card className="border-2 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-lg">Birds & Mortality Summary</CardTitle>
-          <CardDescription>Current flock status and mortality tracking</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Initial Birds Placed</p>
-              <p className="text-2xl font-bold">{batch.initialBirds.toLocaleString("en-IN")}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Mortality</p>
-              <p className="text-2xl font-bold text-red-600">
-                {latestLog ? latestLog.cumulativeMortality.toLocaleString("en-IN") : 0}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Live Birds</p>
-              <p className="text-2xl font-bold text-green-600">{currentBirds.toLocaleString("en-IN")}</p>
-              <p className="text-xs text-muted-foreground">
-                = {batch.initialBirds.toLocaleString("en-IN")} -{" "}
-                {latestLog ? latestLog.cumulativeMortality.toLocaleString("en-IN") : 0}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Mortality %</p>
-              <p
-                className={`text-2xl font-bold ${mortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
-              >
-                {mortalityPercent.toFixed(2)}%
-              </p>
-              <p className="text-xs text-muted-foreground">
-                = ({latestLog ? latestLog.cumulativeMortality : 0} / {batch.initialBirds}) × 100
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-2 border-blue-500/20">
-        <CardHeader>
-          <CardTitle className="text-lg">Age & Feed Conversion</CardTitle>
-          <CardDescription>Flock age and feed efficiency metrics</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Age in Days</p>
-              <p className="text-2xl font-bold">{ageInDays}</p>
-              <p className="text-xs text-muted-foreground mt-1">From: {formatIndianDate(batch.placementDate)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Feed Used (kg)</p>
-              <p className="text-2xl font-bold">{totalFeedUsed.toFixed(1)}</p>
-              <p className="text-xs text-muted-foreground">{weeklyFeeds.length} weekly entries</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Latest Avg Weight (kg)</p>
-              <p className="text-2xl font-bold">{latestWeight > 0 ? latestWeight.toFixed(2) : "0.00"}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Cumulative FCR</p>
-              <p
-                className={`text-2xl font-bold ${currentFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}
-              >
-                {currentFCR.toFixed(2)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                = {totalFeedUsed.toFixed(0)} / ({currentBirds} × {latestWeight > 0 ? latestWeight.toFixed(2) : "0"})
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Age</CardTitle>
+      <div className="grid gap-2 md:grid-cols-2">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Birds & Mortality</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{ageInDays} days</p>
-            <p className="text-xs text-muted-foreground mt-1">Placed: {formatIndianDate(batch.placementDate)}</p>
+          <CardContent className="p-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Initial Birds</p>
+                <p className="text-xl font-black tracking-tight">{batch.initialBirds.toLocaleString("en-IN")}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-red-400 uppercase font-bold tracking-tight">Mortality</p>
+                <p className="text-xl font-black tracking-tight text-red-600">
+                  {latestLog ? latestLog.cumulativeMortality.toLocaleString("en-IN") : 0}
+                </p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-green-400 uppercase font-bold tracking-tight">Live Birds</p>
+                <p className="text-xl font-black tracking-tight text-green-600">{currentBirds.toLocaleString("en-IN")}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Mortality %</p>
+                <p
+                  className={`text-xl font-black tracking-tight ${mortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
+                >
+                  {mortalityPercent.toFixed(2)}%
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Live Birds</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Age & Feed Conversion</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{currentBirds.toLocaleString("en-IN")}</p>
-            <p className="text-xs text-muted-foreground mt-1">Initial: {batch.initialBirds.toLocaleString("en-IN")}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">FCR</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-2xl font-bold ${currentFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}>
-              {currentFCR.toFixed(2)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              Target: {batch.targetFCR}
-              {currentFCR > batch.targetFCR ? (
-                <TrendingUp className="h-3 w-3 text-orange-600" />
-              ) : (
-                <TrendingDown className="h-3 w-3 text-green-600" />
-              )}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Mortality %</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p
-              className={`text-2xl font-bold ${mortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
-            >
-              {mortalityPercent.toFixed(2)}%
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Threshold: {batch.mortalityThreshold}% | Total: {totalMortality} birds
-            </p>
+          <CardContent className="p-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Age (Days)</p>
+                <p className="text-xl font-black tracking-tight">{ageInDays}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-blue-400 uppercase font-bold tracking-tight">Feed (kg)</p>
+                <p className="text-xl font-black tracking-tight text-blue-600">{totalFeedUsed.toFixed(0)}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Avg Wt (kg)</p>
+                <p className="text-xl font-black tracking-tight text-slate-700">{latestWeight > 0 ? latestWeight.toFixed(2) : "0.00"}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Cum. FCR</p>
+                <p
+                  className={`text-xl font-black tracking-tight ${currentFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}
+                >
+                  {currentFCR.toFixed(2)}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
+
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -330,26 +261,28 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Weekly Feed & Weight Records</CardTitle>
-          <CardDescription>Feed and average weight entries recorded by week</CardDescription>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+          <CardTitle className="text-xs font-bold">Weekly Feed & Weight</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold mb-4">{totalFeedUsed.toFixed(1)} kg total feed</p>
+        <CardContent className="p-2.5">
+          <div className="flex items-baseline gap-2 mb-2">
+            <p className="text-lg font-black">{totalFeedUsed.toFixed(0)} kg</p>
+            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Total Feed</p>
+          </div>
           {weeklyFeeds.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {weeklyFeeds.map((feed) => (
-                <div key={feed.id} className="flex justify-between items-center p-3 bg-muted rounded">
+                <div key={feed.id} className="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
                   <div>
-                    <span className="text-sm font-medium">
+                    <span className="text-xs font-bold">
                       {formatIndianDate(feed.weekStart)} - {formatIndianDate(feed.weekEnd)}
                     </span>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Avg Weight: {feed.averageWeightKg.toFixed(2)} kg
+                    <p className="text-[10px] text-muted-foreground">
+                      Avg Weight: <span className="font-bold text-slate-700">{feed.averageWeightKg.toFixed(2)} kg</span>
                     </p>
                   </div>
-                  <span className="font-semibold">{feed.totalFeedKg.toFixed(1)} kg</span>
+                  <span className="text-xs font-bold text-blue-600">{feed.totalFeedKg.toFixed(1)} kg</span>
                 </div>
               ))}
             </div>
@@ -360,44 +293,44 @@ export default function BatchDetailsPage({ params }: { params: { id: string } })
       </Card>
 
       {/* Daily Log History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Daily Log History</CardTitle>
-          <CardDescription>{batchLogs.length} logs recorded</CardDescription>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+          <CardTitle className="text-sm font-bold">Daily Log History</CardTitle>
+          <CardDescription className="text-[10px]">{batchLogs.length} logs recorded</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Age (days)</TableHead>
-                  <TableHead>Opening</TableHead>
-                  <TableHead>Mortality</TableHead>
-                  <TableHead>Closing</TableHead>
-                  <TableHead>FCR</TableHead>
-                  <TableHead>Mort %</TableHead>
+                <TableRow className="h-10 bg-slate-50/50">
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">Date</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">Age</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">Opening</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">Mortality</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">Closing</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">FCR</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-tight">Mort %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {batchLogs.map((log) => {
-                  const logDate = new Date(log.date)
-                  const age = Math.ceil((logDate.getTime() - placementDate.getTime()) / (1000 * 60 * 60 * 24))
+                  const logTime = toDateKey(log.date)
+                  const age = Math.ceil((logTime - placementDateTime) / (1000 * 60 * 60 * 24))
 
                   return (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap">{formatIndianDate(log.date)}</TableCell>
-                      <TableCell>{age}</TableCell>
-                      <TableCell>{log.openingBirds.toLocaleString("en-IN")}</TableCell>
-                      <TableCell>{log.mortality}</TableCell>
-                      <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
+                    <TableRow key={log.id} className="h-11">
+                      <TableCell className="text-xs py-1 whitespace-nowrap">{formatIndianDate(log.date)}</TableCell>
+                      <TableCell className="text-xs py-1">{age}d</TableCell>
+                      <TableCell className="text-xs py-1">{log.openingBirds.toLocaleString("en-IN")}</TableCell>
+                      <TableCell className="text-xs py-1 font-medium text-red-600">{log.mortality}</TableCell>
+                      <TableCell className="text-xs py-1 font-bold text-slate-900">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
                       <TableCell
-                        className={`font-semibold ${log.cumulativeFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}
+                        className={`text-xs py-1 font-bold ${log.cumulativeFCR > batch.targetFCR ? "text-orange-600" : "text-green-600"}`}
                       >
                         {log.cumulativeFCR.toFixed(2)}
                       </TableCell>
                       <TableCell
-                        className={`font-semibold ${log.cumulativeMortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
+                        className={`text-xs py-1 font-bold ${log.cumulativeMortalityPercent > batch.mortalityThreshold ? "text-red-600" : "text-green-600"}`}
                       >
                         {log.cumulativeMortalityPercent.toFixed(2)}%
                       </TableCell>

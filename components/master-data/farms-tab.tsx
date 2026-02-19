@@ -70,17 +70,23 @@ export function FarmsTab() {
   }
 
   return (
-    <div>
-      <div className="flex justify-end mb-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Farms</h2>
+          <p className="text-[9px] font-medium text-slate-400">Manage multiple farm locations</p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
+              size="sm"
+              className="h-8 text-xs font-bold"
               onClick={() => {
                 setEditingId(null)
                 setFormData({ name: "", location: "", capacity: "" })
               }}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Farm
             </Button>
           </DialogTrigger>
@@ -123,9 +129,9 @@ export function FarmsTab() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {farms.length === 0 ? (
-          <Card className="col-span-full">
+          <Card className="col-span-full shadow-sm">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground mb-4">No farms added yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
@@ -136,20 +142,20 @@ export function FarmsTab() {
           </Card>
         ) : (
           farms.map((farm) => (
-            <Card key={farm.id}>
-              <CardHeader>
-                <CardTitle>{farm.name}</CardTitle>
-                <CardDescription>{farm.location}</CardDescription>
+            <Card key={farm.id} className="shadow-sm">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+                <CardTitle className="text-sm font-bold">{farm.name}</CardTitle>
+                <CardDescription className="text-xs">{farm.location}</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">Capacity: {farm.capacity.toLocaleString()} birds</p>
+              <CardContent className="p-4">
+                <p className="text-xs font-bold text-slate-700 mb-4">Capacity: {farm.capacity.toLocaleString()} birds</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(farm)}>
-                    <Edit className="h-3 w-3 mr-1" />
+                  <Button variant="outline" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleEdit(farm)}>
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(farm.id)}>
-                    <Trash2 className="h-3 w-3 mr-1" />
+                  <Button variant="destructive" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleDelete(farm.id)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                     Delete
                   </Button>
                 </div>

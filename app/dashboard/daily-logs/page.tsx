@@ -8,14 +8,16 @@ import { useAuth } from "@/lib/auth-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
-import { useDailyLogs, type DailyLog } from "@/lib/daily-logs-context"
+import { useDailyLogs, type DailyLog, toDateKey } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Trash2, Filter, TrendingUp, Edit, Calendar } from "lucide-react"
+import { Plus, Trash2, Filter, TrendingUp, Edit, Calendar, FileText } from "lucide-react"
+import { jsPDF } from "jspdf"
+import autoTable from "jspdf-autotable"
 import {
   Dialog,
   DialogContent,
@@ -56,6 +58,8 @@ export default function DailyLogsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isWeeklyFeedDialogOpen, setIsWeeklyFeedDialogOpen] = useState(false)
   const [filterHouse, setFilterHouse] = useState<string>("all")
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
   const [lastSavedLog, setLastSavedLog] = useState<any>(null)
   const [editingLog, setEditingLog] = useState<string | null>(null)
   const [editBatchId, setEditBatchId] = useState<string | null>(null)
@@ -143,7 +147,7 @@ export default function DailyLogsPage() {
   // Use section mortality if sections exist, otherwise use formData.mortality
   const finalMortality = batchSections.length > 0 
     ? totalMortality 
-    : Number.parseInt(formData.mortality || "0")
+    : Number.parseInt(formData.mortality || "0", 10) || 0
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -325,11 +329,128 @@ export default function DailyLogsPage() {
 
   const filteredLogs = filterHouse === "all" ? dailyLogs : dailyLogs.filter((log) => log.houseId === filterHouse)
   const accessibleLogs = filteredLogs.filter((log) => {
+    // Apply date range filter
+    const logTime = toDateKey(log.date)
+    if (startDate && logTime < toDateKey(startDate)) return false
+    if (endDate && logTime > toDateKey(endDate)) return false
+
+    // If houseId is missing, show it (as "Unknown House")
+    if (!log.houseId) return true
     const house = allHouses.find((h) => h.id === log.houseId)
-    if (!house) return false
+    // If house not found in master data, show it
+    if (!house) return true
+    // If it's an owner, they see everything
+    if (user?.role === "owner") return true
+    // Otherwise check farm access
     return farms.some((f) => f.id === house.farmId)
   })
-  const sortedLogs = [...accessibleLogs].sort((a, b) => b.date.localeCompare(a.date))
+  const sortedLogs = [...accessibleLogs].sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+
+  // Calculate summary metrics for the current view
+  const summaryMetrics = {
+    totalMortality: sortedLogs.reduce((sum, log) => sum + log.mortality, 0),
+    latestClosingBirds: sortedLogs.length > 0 ? sortedLogs[0].closingBirds : 0,
+    latestCumMortalityPercent: sortedLogs.length > 0 ? sortedLogs[0].cumulativeMortalityPercent : 0,
+    daysLogged: sortedLogs.length,
+    avgMortalityPerDay: sortedLogs.length > 0
+      ? sortedLogs.reduce((sum, log) => sum + log.mortality, 0) / sortedLogs.length
+      : 0
+  }
+
+  const downloadPDF = () => {
+    if (sortedLogs.length === 0) return
+
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+
+    // Header: B.N.Rao Poultry Farms
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(18)
+    doc.text("B.N.Rao Poultry Farms", pageWidth / 2, 20, { align: "center" })
+
+    // Sub-header
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "normal")
+    doc.text("Daily Production & Mortality Report", pageWidth / 2, 28, { align: "center" })
+
+    // Top-right Date Range
+    const dateRangeText = startDate && endDate
+      ? `Date: ${formatIndianDate(startDate)} to ${formatIndianDate(endDate)}`
+      : `Date: ${formatIndianDate(getTodayDate())}`
+    doc.setFontSize(10)
+    doc.text(dateRangeText, pageWidth - 15, 10, { align: "right" })
+
+    // Summary Section (Executive Summary Box)
+    const summaryY = 35
+    const summaryHeight = 35
+    doc.setFillColor(245, 245, 245) // Light grey
+    doc.rect(15, summaryY, pageWidth - 30, summaryHeight, "F")
+
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(11)
+    doc.text("EXECUTIVE SUMMARY", 20, summaryY + 8)
+
+    doc.setFontSize(10)
+    // Left Column
+    doc.setFont("helvetica", "bold")
+    doc.text("Total Mortality:", 20, summaryY + 18)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.totalMortality}`, 65, summaryY + 18)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Cum. Mort %:", 20, summaryY + 28)
+    if (summaryMetrics.latestCumMortalityPercent > 5) {
+      doc.setTextColor(255, 0, 0)
+    }
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.latestCumMortalityPercent.toFixed(2)}%`, 65, summaryY + 28)
+    doc.setTextColor(0, 0, 0) // Reset
+
+    // Right Column
+    const rightColX = pageWidth / 2 + 5
+    const rightValueX = rightColX + 45
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Closing Birds:", rightColX, summaryY + 18)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}`, rightValueX, summaryY + 18)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Avg. Mort/Day:", rightColX, summaryY + 28)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${summaryMetrics.avgMortalityPerDay.toFixed(1)}`, rightValueX, summaryY + 28)
+
+    // Data Table
+    const tableHeaders = [["Date", "Farm/House", "Mortality", "Cum. Mort %", "Feed Type", "Closing"]]
+    const tableRows = sortedLogs.map(log => [
+      formatIndianDate(log.date),
+      `${getFarmName(log.houseId)} / ${getHouseName(log.houseId)}`,
+      log.mortality,
+      `${log.cumulativeMortalityPercent.toFixed(2)}%`,
+      getFeedTypeName(log.feedTypeId),
+      log.closingBirds.toLocaleString("en-IN")
+    ])
+
+    autoTable(doc, {
+      startY: summaryY + summaryHeight + 10,
+      head: tableHeaders,
+      body: tableRows,
+      theme: "striped",
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: 'center' },
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: {
+        0: { cellWidth: 25, halign: 'center' },
+        1: { cellWidth: 'auto', halign: 'center' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center' },
+        4: { cellWidth: 35, halign: 'center' },
+        5: { cellWidth: 25, halign: 'center' }
+      }
+    })
+
+    const reportDate = new Date().toISOString().split("T")[0]
+    doc.save(`BNRao_Farms_Report_${reportDate}.pdf`)
+  }
 
   const startAddNewLog = () => {
     setEditingLog(null)
@@ -348,20 +469,32 @@ export default function DailyLogsPage() {
     setIsDialogOpen(true)
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Daily Logs</h1>
-          <p className="text-muted-foreground mt-1">Track daily activities and metrics for your broiler flocks</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Daily Logs</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Track daily metrics for your flocks</p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={downloadPDF} variant="outline" size="sm" className="h-8 text-xs font-bold" disabled={sortedLogs.length === 0}>
+            <FileText className="h-4 w-4 mr-1.5" />
+            Download PDF
+          </Button>
           {user && user.role === "owner" && (
             <Dialog open={isWeeklyFeedDialogOpen} onOpenChange={setIsWeeklyFeedDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Weekly Feed Entry
+                <Button variant="outline" size="sm" className="h-8 text-xs font-bold">
+                  <Calendar className="h-4 w-4 mr-1.5" />
+                  Weekly Feed
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
@@ -467,8 +600,8 @@ export default function DailyLogsPage() {
           {user && (user.role === "owner" || user.role === "manager") && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={startAddNewLog}>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button onClick={startAddNewLog} size="sm" className="h-8 text-xs font-bold">
+                  <Plus className="h-4 w-4 mr-1.5" />
                   Add Daily Log
                 </Button>
               </DialogTrigger>
@@ -712,23 +845,59 @@ export default function DailyLogsPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2">
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Total Mortality</p>
+          <p className="text-lg font-black text-red-600 leading-tight tracking-tight">
+            {summaryMetrics.totalMortality.toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Closing Birds</p>
+          <p className="text-lg font-black text-slate-900 leading-tight tracking-tight">
+            {summaryMetrics.latestClosingBirds.toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        <div className={`bg-white p-2.5 rounded-lg border shadow-sm ${summaryMetrics.latestCumMortalityPercent > 5 ? 'border-red-500 bg-red-50/30' : 'border-slate-200/60'}`}>
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Cum. Mort. %</p>
+          <p className={`text-lg font-black leading-tight tracking-tight ${summaryMetrics.latestCumMortalityPercent > 5 ? 'text-red-600' : 'text-orange-600'}`}>
+            {summaryMetrics.latestCumMortalityPercent.toFixed(2)}%
+          </p>
+        </div>
+
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Days Logged</p>
+          <p className="text-lg font-black text-slate-900 leading-tight tracking-tight">
+            {summaryMetrics.daysLogged}
+          </p>
+        </div>
+
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Avg. Mort/Day</p>
+          <p className="text-lg font-black text-slate-900 leading-tight tracking-tight">
+            {summaryMetrics.avgMortalityPerDay.toFixed(1)}
+          </p>
+        </div>
+      </div>
+
       {weeklyFeeds.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Weekly Feed Entries</CardTitle>
-            <CardDescription>Feed consumption records by week</CardDescription>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Weekly Feed Entries</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>House</TableHead>
-                    <TableHead>Week Start</TableHead>
-                    <TableHead>Week End</TableHead>
-                    <TableHead>Total Feed (kg)</TableHead>
-                    <TableHead>Avg Weight (kg)</TableHead>
-                    {user?.role === "owner" && <TableHead className="text-center">Actions</TableHead>}
+                  <TableRow className="h-8 bg-slate-50/50">
+                    <TableHead className="text-[10px] h-8">House</TableHead>
+                    <TableHead className="text-[10px] h-8">Week Start</TableHead>
+                    <TableHead className="text-[10px] h-8">Week End</TableHead>
+                    <TableHead className="text-[10px] h-8 text-right">Total Feed (kg)</TableHead>
+                    <TableHead className="text-[10px] h-8 text-right">Avg Weight (kg)</TableHead>
+                    {user?.role === "owner" && <TableHead className="text-center text-[10px] h-8">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -740,24 +909,25 @@ export default function DailyLogsPage() {
                     })
                     .sort((a, b) => b.weekEnd.localeCompare(a.weekEnd))
                     .map((feed) => (
-                      <TableRow key={feed.id}>
-                        <TableCell>{getHouseName(feed.houseId)}</TableCell>
-                        <TableCell>{formatIndianDate(feed.weekStart)}</TableCell>
-                        <TableCell>{formatIndianDate(feed.weekEnd)}</TableCell>
-                        <TableCell className="font-semibold">{(feed.totalFeedKg || 0).toFixed(1)} kg</TableCell>
-                        <TableCell className="font-semibold">{(feed.averageWeightKg || 0).toFixed(2)} kg</TableCell>
+                      <TableRow key={feed.id} className="h-9">
+                        <TableCell className="text-[11px] py-1">{getHouseName(feed.houseId)}</TableCell>
+                        <TableCell className="text-[11px] py-1">{formatIndianDate(feed.weekStart)}</TableCell>
+                        <TableCell className="text-[11px] py-1">{formatIndianDate(feed.weekEnd)}</TableCell>
+                        <TableCell className="text-[11px] py-1 font-semibold text-right">{(feed.totalFeedKg || 0).toFixed(1)} kg</TableCell>
+                        <TableCell className="text-[11px] py-1 font-semibold text-right">{(feed.averageWeightKg || 0).toFixed(2)} kg</TableCell>
                         {user?.role === "owner" && (
-                          <TableCell>
+                          <TableCell className="text-center py-1">
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="h-6 w-6 p-0"
                               onClick={() => {
                                 if (confirm("Delete this weekly feed entry?")) {
                                   deleteWeeklyFeed(feed.id)
                                 }
                               }}
                             >
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                              <Trash2 className="h-3 w-3 text-red-600" />
                             </Button>
                           </TableCell>
                         )}
@@ -770,50 +940,65 @@ export default function DailyLogsPage() {
         </Card>
       )}
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filter Logs
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Filter by House</label>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/80">
+          <div className="flex flex-col">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Daily Logs History</CardTitle>
+            <CardDescription className="text-[9px] font-medium text-slate-400 hidden sm:block">View recorded daily metrics</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-3 w-3 text-slate-400" />
+            <div className="flex items-center gap-1 bg-white border rounded-md px-1.5 h-7">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">From:</span>
+              <input
+                type="date"
+                className="text-[10px] border-none focus:ring-0 p-0 w-24 bg-transparent outline-none"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+              <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">To:</span>
+              <input
+                type="date"
+                className="text-[10px] border-none focus:ring-0 p-0 w-24 bg-transparent outline-none"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => { setStartDate(""); setEndDate(""); }}
+                  className="text-[9px] font-bold text-red-500 uppercase ml-1 hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <Select value={filterHouse} onValueChange={setFilterHouse}>
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className="h-7 w-[110px] text-[11px] font-medium bg-white">
+                <SelectValue placeholder="All Houses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Houses</SelectItem>
+                <SelectItem value="all" className="text-xs">All Houses</SelectItem>
                 {activeHouses.map((house) => (
-                  <SelectItem key={house.id} value={house.id}>
+                  <SelectItem key={house.id} value={house.id} className="text-[10px]">
                     {house.name} - {getFarmName(house.id)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daily Logs History</CardTitle>
-          <CardDescription>View all recorded daily logs for your batches</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-fixed w-full border-collapse">
               <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Farm</TableHead>
-                  <TableHead>House</TableHead>
-                  <TableHead>Mortality</TableHead>
-                  <TableHead>Feed Type</TableHead>
-                  <TableHead>Closing Birds</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                <TableRow className="bg-slate-50/50 h-9">
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-[11px] align-middle uppercase tracking-tighter">Date</TableHead>
+                  <TableHead className="w-[20%] font-bold text-slate-700 text-xs text-center align-middle">Farm/House</TableHead>
+                  <TableHead className="w-[10%] font-bold text-slate-700 text-xs align-middle">Mortality</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Cum. Mort %</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Feed Type</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Closing</TableHead>
+                  <TableHead className="w-[10%] font-bold text-slate-700 text-xs text-center align-middle">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -825,22 +1010,55 @@ export default function DailyLogsPage() {
                   </TableRow>
                 ) : (
                   sortedLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap">{formatIndianDate(log.date)}</TableCell>
-                      <TableCell>{getFarmName(log.houseId)}</TableCell>
-                      <TableCell>{getHouseName(log.houseId)}</TableCell>
-                      <TableCell>{log.mortality}</TableCell>
-                      <TableCell>{getFeedTypeName(log.feedTypeId)}</TableCell>
-                      <TableCell className="font-semibold">{log.closingBirds.toLocaleString("en-IN")}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
+                    <TableRow key={log.id} className="hover:bg-slate-50 transition-colors h-11">
+                      <TableCell className="whitespace-nowrap align-middle py-0 text-xs">
+                        {formatIndianDate(log.date)}
+                      </TableCell>
+                      <TableCell className="align-middle py-0">
+                        <div className="flex flex-col items-center justify-center text-center leading-none">
+                          <div className="text-[9px] font-bold text-slate-700 uppercase tracking-tighter">
+                            {getFarmName(log.houseId)}
+                          </div>
+                          <div className="text-xs font-medium text-slate-500">
+                            {getHouseName(log.houseId)}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-middle py-0 text-xs font-medium">
+                        {log.mortality}
+                      </TableCell>
+                      <TableCell className="align-middle py-0">
+                        <span className={`text-xs font-semibold ${log.cumulativeMortalityPercent > 5 ? 'text-red-600' : 'text-slate-600'}`}>
+                          {log.cumulativeMortalityPercent.toFixed(2)}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-middle py-0 text-[11px] text-slate-600 truncate">
+                        {getFeedTypeName(log.feedTypeId)}
+                      </TableCell>
+                      <TableCell className="align-middle py-0 text-xs font-bold text-slate-900">
+                        {log.closingBirds.toLocaleString("en-IN")}
+                      </TableCell>
+                      <TableCell className="align-middle py-0">
+                        <div className="flex items-center justify-center gap-1.5">
                           {user?.role === "owner" && (
                             <>
-                              <Button variant="outline" size="sm" onClick={() => handleEdit(log)}>
-                                <Edit className="h-4 w-4" />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => handleEdit(log)}
+                                title="Edit Log"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDelete(log.id)}>
-                                <Trash2 className="h-4 w-4" />
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => handleDelete(log.id)}
+                                title="Delete Log"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           )}
@@ -852,6 +1070,7 @@ export default function DailyLogsPage() {
               </TableBody>
             </Table>
           </div>
+
         </CardContent>
       </Card>
     </div>

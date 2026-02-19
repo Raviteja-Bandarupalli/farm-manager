@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
+import { toDateKey } from "./daily-logs-context"
 
 export interface Transaction {
   id: string
@@ -43,9 +44,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from("transactions")
         .select("*")
-        .order("date", { ascending: false })
       if (error) throw error
-      setTransactions((data as Transaction[]) || [])
+      const list = (data as Transaction[]) || []
+      // Sort by date descending
+      list.sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+      setTransactions(list)
     } catch (e) {
       logFetchError("transactions", e)
       setTransactions([])
@@ -82,20 +85,40 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     await fetchTransactions()
   }
 
-  const getTransactionsByDateRange = (startDate: string, endDate: string) =>
-    transactions
-      .filter((t) => t.date >= startDate && t.date <= endDate)
-      .sort((a, b) => b.date.localeCompare(a.date))
+  const getTransactionsByDateRange = (startDate: string, endDate: string) => {
+    const start = toDateKey(startDate)
+    const end = toDateKey(endDate)
+    return transactions
+      .filter((t) => {
+        const tTime = toDateKey(t.date)
+        return tTime >= start && tTime <= end
+      })
+      .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+  }
 
   const getTotalIncome = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "income")
-    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
+    if (startDate && endDate) {
+      const start = toDateKey(startDate)
+      const end = toDateKey(endDate)
+      filtered = filtered.filter((t) => {
+        const tTime = toDateKey(t.date)
+        return tTime >= start && tTime <= end
+      })
+    }
     return filtered.reduce((sum, t) => sum + t.amount, 0)
   }
 
   const getTotalExpenses = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "expense")
-    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
+    if (startDate && endDate) {
+      const start = toDateKey(startDate)
+      const end = toDateKey(endDate)
+      filtered = filtered.filter((t) => {
+        const tTime = toDateKey(t.date)
+        return tTime >= start && tTime <= end
+      })
+    }
     return filtered.reduce((sum, t) => sum + t.amount, 0)
   }
 
@@ -104,7 +127,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const getIncomeByCategory = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "income")
-    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
+    if (startDate && endDate) {
+      const start = toDateKey(startDate)
+      const end = toDateKey(endDate)
+      filtered = filtered.filter((t) => {
+        const tTime = toDateKey(t.date)
+        return tTime >= start && tTime <= end
+      })
+    }
     return filtered.reduce((acc, t) => {
       acc[t.category] = (acc[t.category] || 0) + t.amount
       return acc
@@ -113,7 +143,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const getExpensesByCategory = (startDate?: string, endDate?: string) => {
     let filtered = transactions.filter((t) => t.type === "expense")
-    if (startDate && endDate) filtered = filtered.filter((t) => t.date >= startDate && t.date <= endDate)
+    if (startDate && endDate) {
+      const start = toDateKey(startDate)
+      const end = toDateKey(endDate)
+      filtered = filtered.filter((t) => {
+        const tTime = toDateKey(t.date)
+        return tTime >= start && tTime <= end
+      })
+    }
     return filtered.reduce((acc, t) => {
       acc[t.category] = (acc[t.category] || 0) + t.amount
       return acc
