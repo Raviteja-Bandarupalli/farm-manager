@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory } from "@/lib/inventory-context"
+import { useMasterData } from "@/lib/master-data-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate, getFirstDayOfMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,7 @@ export default function FinancePage() {
     getExpensesByCategory,
   } = useFinance()
   const { issues, getItemById } = useInventory()
+  const { farms } = useMasterData()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null)
@@ -67,21 +69,21 @@ export default function FinancePage() {
     date: getTodayDate(),
     description: "",
     reference: "",
+    farmId: "",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const payload = {
+        ...formData,
+        amount: Number.parseFloat(formData.amount),
+        farmId: formData.farmId === "none" || formData.farmId === "" ? undefined : formData.farmId,
+      }
       if (editingId) {
-        await updateTransaction(editingId, {
-          ...formData,
-          amount: Number.parseFloat(formData.amount),
-        })
+        await updateTransaction(editingId, payload)
       } else {
-        await addTransaction({
-          ...formData,
-          amount: Number.parseFloat(formData.amount),
-        })
+        await addTransaction(payload)
       }
       setFormData({
         type: "income",
@@ -90,6 +92,7 @@ export default function FinancePage() {
         date: getTodayDate(),
         description: "",
         reference: "",
+        farmId: "",
       })
       setEditingId(null)
       setIsDialogOpen(false)
@@ -108,6 +111,7 @@ export default function FinancePage() {
       date: transaction.date,
       description: transaction.description,
       reference: transaction.reference,
+      farmId: transaction.farmId || "",
     })
     setIsDialogOpen(true)
   }
@@ -186,6 +190,7 @@ export default function FinancePage() {
                   date: getTodayDate(),
                   description: "",
                   reference: "",
+                  farmId: "",
                 })
               }}
             >
@@ -211,6 +216,25 @@ export default function FinancePage() {
                   <SelectContent>
                     <SelectItem value="income">Income</SelectItem>
                     <SelectItem value="expense">Expense</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Farm (Optional)</label>
+                <Select
+                  value={formData.farmId || "none"}
+                  onValueChange={(value) => setFormData({ ...formData, farmId: value })}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Global / No Farm" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Global / No Farm</SelectItem>
+                    {farms.map((farm) => (
+                      <SelectItem key={farm.id} value={farm.id}>
+                        {farm.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -454,6 +478,7 @@ export default function FinancePage() {
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Farm</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead className="text-right">Amount (₹)</TableHead>
@@ -477,6 +502,9 @@ export default function FinancePage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium">{transaction.category}</TableCell>
+                      <TableCell className="text-xs font-bold text-slate-500">
+                        {farms.find(f => f.id === transaction.farmId)?.name || "-"}
+                      </TableCell>
                       <TableCell className="max-w-xs truncate">{transaction.description || "-"}</TableCell>
                       <TableCell>{transaction.reference || "-"}</TableCell>
                       <TableCell
