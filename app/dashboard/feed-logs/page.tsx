@@ -118,11 +118,11 @@ export default function FeedLogsPage() {
   const avgCostPerKg = totalMixed > 0 ? totalCostVal / totalMixed : 0
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight">Daily Feed Mixing Log</h1>
-          <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Farm-wise Production & House-wise Distribution</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Daily Feed Mixing</h1>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Farm-wise Production & House-wise Distribution</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -260,9 +260,9 @@ export default function FeedLogsPage() {
           { label: 'Total Produced', value: totalMixed, suffix: 'KG', sub: 'Mixed Feed' },
           { label: 'Avg Feed Cost', value: avgCostPerKg.toFixed(2), prefix: '₹', suffix: '/KG', sub: 'Estimated' },
         ].map((stat, i) => (
-          <Card key={i} className="shadow-sm border-none bg-white">
-            <CardHeader className="py-1.5 px-3 border-b">
-              <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">{stat.label}</span>
+          <Card key={i} className="shadow-sm border-slate-200/60 overflow-hidden">
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">{stat.label}</span>
             </CardHeader>
             <CardContent className="p-2.5">
               <div className="text-xl font-black tracking-tight text-slate-900">
@@ -275,13 +275,13 @@ export default function FeedLogsPage() {
       </div>
 
       {/* Filters */}
-      <Card className="shadow-sm border-none">
-        <CardHeader className="py-3 px-4 border-b">
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Filter by Farm</label>
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Filter by Farm</label>
               <Select value={filterFarm} onValueChange={setFilterFarm}>
-                <SelectTrigger className="w-64 h-9 bg-slate-50 border-slate-200 text-xs font-bold">
+                <SelectTrigger className="w-48 h-8 bg-white border-slate-200 text-[11px] font-bold">
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent>
@@ -291,8 +291,8 @@ export default function FeedLogsPage() {
               </Select>
             </div>
             <div className="text-right">
-              <CardTitle className="text-base font-bold">Feed Movement Ledger</CardTitle>
-              <p className="text-[10px] uppercase font-bold text-slate-400">Chronological Mixing History</p>
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Feed Movement Ledger</CardTitle>
+              <p className="text-[9px] font-medium text-slate-400">Chronological Mixing History</p>
             </div>
           </div>
         </CardHeader>

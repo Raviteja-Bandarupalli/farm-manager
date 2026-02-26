@@ -124,7 +124,6 @@ export default function DashboardPage() {
 
   const activeBatches = batches.filter((b) => b.status === "active")
   const activeBatchCount = activeBatches.length
-  const activeHousesCount = houses.filter((h) => h.status === "active").length
 
   let totalLiveBirds = 0
   let avgFCR = 0
@@ -142,9 +141,11 @@ export default function DashboardPage() {
     let targetFCRSum = 0
     let ageSum = 0
 
+    console.log("[v0] Calculating live birds for", activeBatches.length, "active batches")
+
     activeBatches.forEach((batch) => {
       const today = new Date().getTime()
-      const placement = new Date(batch.placementDate).getTime()
+      const placement = toDateKey(batch.placementDate)
       const age = Math.max(0, Math.ceil((today - placement) / (1000 * 60 * 60 * 24)))
       ageSum += age
 
@@ -152,13 +153,20 @@ export default function DashboardPage() {
       const latestLog = batchLogs[0]
 
       if (latestLog) {
+        console.log(`[v0] Batch ${batch.batchNumber}: Latest log shows ${latestLog.closingBirds} closing birds`)
         totalLiveBirds += latestLog.closingBirds
         
+        // Calculate total deaths for this batch
+        // Use cumulativeMortality if available, otherwise sum all mortalities from batch logs
         let batchTotalDeaths = 0
         if (latestLog.cumulativeMortality !== undefined && latestLog.cumulativeMortality !== null) {
+          // Use cumulative value if available
           batchTotalDeaths = latestLog.cumulativeMortality + (latestLog.cumulativeCulls || 0)
+          console.log(`[v0] Batch ${batch.batchNumber}: Using cumulative mortality: ${latestLog.cumulativeMortality}`)
         } else {
+          // Fallback: sum all mortalities from logs if cumulative not available
           batchTotalDeaths = batchLogs.reduce((sum, log) => sum + (log.mortality || 0), 0) + (latestLog.cumulativeCulls || 0)
+          console.log(`[v0] Batch ${batch.batchNumber}: Summing mortalities from ${batchLogs.length} logs: ${batchTotalDeaths}`)
         }
         
         totalDeaths += batchTotalDeaths
@@ -175,7 +183,7 @@ export default function DashboardPage() {
         ) {
           const house = houses.find((h) => h.id === batch.houseId)
           const farm = house ? farms.find((f) => f.id === house.farmId) : null
-          const logAge = Math.ceil(
+          const age = Math.ceil(
             (toDateKey(latestLog.date) - toDateKey(batch.placementDate)) / (1000 * 60 * 60 * 24),
           )
 
@@ -183,7 +191,7 @@ export default function DashboardPage() {
             farm: farm?.name || "Unknown",
             house: house?.name || "Unknown",
             batchNumber: batch.batchNumber,
-            age: logAge,
+            age,
             fcr: latestLog.cumulativeFCR.toFixed(2),
             mortality: latestLog.cumulativeMortalityPercent.toFixed(2),
             fcrExceeded: latestLog.cumulativeFCR > batch.targetFCR,
@@ -191,6 +199,7 @@ export default function DashboardPage() {
           })
         }
       } else {
+        console.log(`[v0] Batch ${batch.batchNumber}: No logs yet, using initial birds ${batch.initialBirds}`)
         totalLiveBirds += batch.initialBirds
         totalInitialBirds += batch.initialBirds
       }
@@ -198,15 +207,24 @@ export default function DashboardPage() {
       targetFCRSum += batch.targetFCR
     })
 
+    console.log(`[v0] Total live birds calculated: ${totalLiveBirds.toLocaleString("en-IN")}`)
+    console.log(`[v0] Total initial birds: ${totalInitialBirds.toLocaleString("en-IN")}`)
+    console.log(`[v0] Total deaths calculated: ${totalDeaths}`)
+
     avgFCR = fcrCount > 0 ? fcrSum / fcrCount : 0
     avgTargetFCR = activeBatches.length > 0 ? targetFCRSum / activeBatches.length : 0
     avgAgeDays = activeBatches.length > 0 ? Math.round(ageSum / activeBatches.length) : 0
   }
   
+  // Calculate mortality - use cumulative from logs if available, otherwise sum all mortalities
   if (totalInitialBirds > 0) {
     avgMortality = (totalDeaths / totalInitialBirds) * 100
+    console.log(`[v0] Average mortality calculated: ${avgMortality.toFixed(2)}% (Deaths: ${totalDeaths}, Initial: ${totalInitialBirds})`)
   } else if (dailyLogs.length > 0) {
+    // Fallback: Calculate mortality from all daily logs if no active batches or no initial birds
+    console.log("[v0] No active batches or initial birds, calculating mortality from all daily logs")
     const totalMortalityFromLogs = dailyLogs.reduce((sum, log) => sum + (log.mortality || 0), 0)
+    // Get starting birds from batches or first log's opening birds
     const startingBirds = batches.length > 0 
       ? batches.reduce((sum, b) => sum + (b.initialBirds || 0), 0)
       : dailyLogs.length > 0 
@@ -217,8 +235,23 @@ export default function DashboardPage() {
       totalDeaths = totalMortalityFromLogs
       totalInitialBirds = startingBirds
       avgMortality = (totalMortalityFromLogs / startingBirds) * 100
+      console.log(`[v0] Mortality from logs: ${avgMortality.toFixed(2)}% (Total mortality: ${totalMortalityFromLogs}, Starting birds: ${startingBirds})`)
+    } else {
+      console.log("[v0] Cannot calculate mortality: No starting birds found")
     }
   }
+
+  const recentLogs = dailyLogs.filter((log) => {
+    const logTime = toDateKey(log.date)
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    return logTime >= thirtyDaysAgo.getTime()
+  })
+
+  const totalMortality = recentLogs.reduce((sum, log) => sum + log.mortality, 0)
+  const totalFeedConsumed = recentLogs.reduce((sum, log) => sum + (log.cumulativeFeed ?? 0), 0)
+
+  const activeHouses = houses.filter((h) => h.status === "active").length
 
   // Mortality Trend (Last 14 days)
   const mortalityTrendData = useMemo(() => {
@@ -286,316 +319,312 @@ export default function DashboardPage() {
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-3xl font-bold">B.N.Rao Poultry Farms | Executive Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Comprehensive Farm Insights</p>
+          <h1 className="text-xl font-extrabold tracking-tight">B.N.Rao Poultry Farms | Executive Dashboard</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Comprehensive Farm Insights</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 bg-secondary/50 p-1.5 rounded-lg border">
-            <div className="flex items-center gap-2 px-2">
-              <span className="text-xs font-bold uppercase text-muted-foreground">Location:</span>
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger className="h-8 min-w-[120px] border-none bg-transparent text-sm font-bold focus:ring-0">
-                  <SelectValue placeholder="Location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Regions</SelectItem>
-                  {Array.from(new Set(filterVisibleFarms(user, allFarms).map(f => f.location))).map(loc => (
-                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {user?.role === "owner" && (
-              <div className="flex items-center gap-2 border-l pl-3 pr-2">
-                <Label htmlFor="financial-view" className="text-xs font-bold uppercase text-muted-foreground cursor-pointer flex items-center gap-1.5">
-                  {showFinancials ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                  Finance View
-                </Label>
-                <Switch
-                  id="financial-view"
-                  checked={showFinancials}
-                  onCheckedChange={setShowFinancials}
-                />
-              </div>
-            )}
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="location-filter" className="text-[10px] font-bold uppercase tracking-tight text-slate-600">Location:</Label>
+            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+              <SelectTrigger id="location-filter" size="sm" className="w-[120px] h-8 text-[11px] font-bold bg-white">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Regions</SelectItem>
+                <SelectItem value="Satuluru">Satuluru</SelectItem>
+                <SelectItem value="Guntur">Guntur</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <Label htmlFor="financial-view" className="text-[10px] font-bold uppercase tracking-tight text-slate-600 flex items-center gap-1.5 cursor-pointer">
+              {showFinancials ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+              Financial View
+            </Label>
+            <Switch
+              id="financial-view"
+              checked={showFinancials}
+              onCheckedChange={setShowFinancials}
+            />
           </div>
         </div>
       </div>
 
       {/* Row 1: Operations */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Houses</CardTitle>
-            <Home className="h-4 w-4 text-muted-foreground" />
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Active Houses</CardTitle>
+            <Home className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeHousesCount}</div>
-            <p className="text-xs text-muted-foreground uppercase">
-              OF {houses.length} TOTAL • {farms.length} locations
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{activeHouses}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+              Across {farms.length} farms
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Live Birds</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Live Birds</CardTitle>
+            <Activity className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalLiveBirds.toLocaleString("en-IN")}</div>
-            <p className="text-xs text-muted-foreground uppercase">
-              Avg. Age: <span className="font-bold">{avgAgeDays} Days</span>
+          <CardContent className="p-2.5">
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-xl font-black tracking-tight">{totalLiveBirds.toLocaleString("en-IN")}</div>
+                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                  Avg. Age: <span className="font-bold text-slate-900">{avgAgeDays} Days</span>
+                </p>
+              </div>
+              <div className="text-right w-20">
+                <p className="text-[8px] font-extrabold text-slate-400 uppercase mb-1">Day {avgAgeDays}/40</p>
+                <Progress value={(avgAgeDays / 40) * 100} className="h-1 bg-slate-100" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Flock Efficiency</CardTitle>
+            <TrendingUp className="h-3.5 w-3.5 text-slate-400 opacity-70" />
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className={`text-xl font-black tracking-tight ${avgFCR <= avgTargetFCR ? "text-green-600" : "text-orange-600"}`}>
+              {avgFCR > 0 ? avgFCR.toFixed(2) : "N/A"} <span className="text-[10px] font-bold text-muted-foreground uppercase ml-0.5">FCR</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5 flex items-center gap-1">
+              Mortality: <span className={`font-bold ${avgMortality > 5 ? 'text-red-600' : avgMortality > 2 ? 'text-orange-500' : 'text-green-600'}`}>{avgMortality.toFixed(1)}%</span>
             </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average FCR</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${avgFCR <= avgTargetFCR ? "text-green-600" : "text-orange-600"}`}>
-              {avgFCR > 0 ? avgFCR.toFixed(2) : "0.00"}
-            </div>
-            <p className="text-xs text-muted-foreground uppercase">Target: {avgTargetFCR.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mortality %</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${avgMortality < 2 ? 'text-green-600' : avgMortality < 5 ? 'text-orange-600' : 'text-red-600'}`}>
-              {avgMortality.toFixed(2)}%
-            </div>
-            <p className="text-xs text-muted-foreground uppercase">{totalDeaths.toLocaleString()} total deaths</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Row 2: Financials (Conditional) */}
       {showFinancials && canAccessFinance(user) && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Balance</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <div className="grid gap-2 md:grid-cols-3 bg-slate-100/50 p-2 rounded-xl border border-slate-200/60 shadow-inner">
+          <Card className="shadow-sm border-slate-200/60 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
+              <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
+              <DollarSign className="h-3.5 w-3.5 text-slate-400 opacity-70" />
             </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+            <CardContent className="p-2.5">
+              <div className={`text-xl font-black tracking-tight ${monthlyBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {formatINR(monthlyBalance)}
               </div>
-              <p className="text-xs text-muted-foreground">{monthlyBalance >= 0 ? "Profit" : "Loss"} this month</p>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{monthlyBalance >= 0 ? "Profit" : "Loss"} this month</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+          <Card className="shadow-sm border-slate-200/60 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
+              <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Expenses</CardTitle>
+              <Package className="h-3.5 w-3.5 text-slate-400 opacity-70" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatINR(monthlyExpenses)}</div>
-              <p className="text-xs text-muted-foreground">Current month</p>
+            <CardContent className="p-2.5">
+              <div className="text-xl font-black text-red-600 tracking-tight">{formatINR(monthlyExpenses)}</div>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Current month</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <Card className="shadow-sm border-slate-200/60 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/30">
+              <CardTitle className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Income</CardTitle>
+              <TrendingUp className="h-3.5 w-3.5 text-slate-400 opacity-70" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatINR(monthlyIncome)}</div>
-              <p className="text-xs text-muted-foreground">Current month</p>
+            <CardContent className="p-2.5">
+              <div className="text-xl font-black text-green-600 tracking-tight">{formatINR(monthlyIncome)}</div>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Current month</p>
             </CardContent>
           </Card>
         </div>
       )}
 
       {(lowStockItems.length > 0 || performanceAlerts.length > 0) && (
-        <Card className="border-yellow-500 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-600 text-base">
-              <AlertTriangle className="h-5 w-5" />
-              Alerts & Notifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {lowStockItems.length > 0 && (
-              <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
-                <Package className="h-5 w-5 text-yellow-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-bold text-yellow-900">Low Stock Alert</p>
-                  <p className="text-sm text-yellow-700">
-                    {lowStockItems.length} items need restocking. Check your inventory.
-                  </p>
-                  <Button asChild variant="link" className="h-auto p-0 text-yellow-600 mt-1 font-bold">
-                    <Link href="/dashboard/inventory">View Inventory →</Link>
-                  </Button>
+        <div className="grid gap-3">
+          {lowStockItems.length > 0 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 rounded-lg border border-amber-200 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-amber-100 rounded-full">
+                  <Package className="h-4 w-4 text-amber-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-amber-900">Low Stock Alert: <span className="font-medium">{lowStockItems.length} items need restocking.</span></p>
                 </div>
               </div>
-            )}
+              <Button asChild variant="link" className="h-auto p-0 text-xs font-bold text-amber-700">
+                <Link href="/dashboard/inventory">View Inventory →</Link>
+              </Button>
+            </div>
+          )}
 
-            {performanceAlerts.length > 0 && (
-              <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
-                <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-bold text-orange-900">Performance Alerts</p>
-                  <p className="text-sm text-orange-700 mb-2 font-medium">{performanceAlerts.length} batches need attention</p>
-                  <div className="flex flex-wrap gap-2">
-                    {performanceAlerts.map((alert, idx) => (
-                      <div key={idx} className="text-xs bg-white p-2 rounded border border-orange-200 shadow-sm">
-                        <span className="font-bold">
-                          {alert.farm} - {alert.house}
-                        </span>
-                        <span className="text-muted-foreground"> | Age: {alert.age}d</span>
-                        {alert.fcrExceeded && <span className="text-orange-600 font-bold"> | FCR: {alert.fcr}</span>}
-                        {alert.mortalityExceeded && (
-                          <span className="text-red-600 font-bold"> | Mort: {alert.mortality}%</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+          {performanceAlerts.length > 0 && (
+            <div className="px-4 py-3 bg-orange-50 rounded-lg border border-orange-200 shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-1.5 bg-orange-100 rounded-full">
+                  <AlertTriangle className="h-4 w-4 text-orange-700" />
                 </div>
+                <p className="text-xs font-bold text-orange-900">Performance Alerts: <span className="font-medium">{performanceAlerts.length} batches need attention</span></p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex flex-wrap gap-2 ml-10">
+                {performanceAlerts.map((alert, idx) => (
+                  <div key={idx} className="text-[10px] bg-white/80 backdrop-blur-sm px-2.5 py-1.5 rounded-md border border-orange-200 shadow-sm flex items-center gap-2">
+                    <span className="font-extrabold text-slate-800 uppercase tracking-tighter">{alert.farm} - {alert.house}</span>
+                    <span className="text-slate-400">|</span>
+                    <span className="font-bold text-slate-600">B{alert.batchNumber} ({alert.age}d)</span>
+                    <div className="flex gap-2 ml-1">
+                      {alert.fcrExceeded && <span className="text-orange-600 font-extrabold">FCR: {alert.fcr}</span>}
+                      {alert.mortalityExceeded && (
+                        <span className="text-red-600 font-extrabold">Mort: {alert.mortality}%</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Sales Summary */}
       {(getTotalBirdsSold() > 0 || getTotalRevenue() > 0) && (
-        <Card className="border-green-500 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-600 text-base">
-              <DollarSign className="h-5 w-5" />
+        <Card className="border-green-200 shadow-sm bg-green-50/10">
+          <CardHeader className="py-1.5 px-3 border-b bg-green-50/50 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-green-800">
+              <DollarSign className="h-3 w-3" />
               Sales Summary
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="p-4 bg-green-50 rounded-lg border border-green-100">
-                <p className="text-sm font-bold text-green-800 mb-1 uppercase tracking-wider">Broilers Sold</p>
-                <p className="text-3xl font-black text-green-600">{getTotalBirdsSold().toLocaleString("en-IN")}</p>
+          <CardContent className="p-2.5">
+            <div className="grid gap-2.5 md:grid-cols-2">
+              <div className="p-2.5 bg-white rounded-lg border border-green-100 shadow-sm">
+                <p className="text-[9px] uppercase font-bold text-green-600/80 mb-0.5 tracking-wider">Broilers Sold</p>
+                <p className="text-lg font-black text-green-700 tracking-tight">{getTotalBirdsSold().toLocaleString("en-IN")}</p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-sm font-bold text-blue-800 mb-1 uppercase tracking-wider">Total Revenue</p>
-                <p className="text-3xl font-black text-blue-600">{formatINR(getTotalRevenue())}</p>
+              <div className="p-2.5 bg-white rounded-lg border border-blue-100 shadow-sm">
+                <p className="text-[9px] uppercase font-bold text-blue-600/80 mb-0.5 tracking-wider">Total Revenue</p>
+                <p className="text-lg font-black text-blue-700 tracking-tight">{formatINR(getTotalRevenue())}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Home className="h-4 w-4" />
+      <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+              <Home className="h-3.5 w-3.5 text-slate-500 opacity-70" />
               Houses Overview
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Total Houses</span>
-                <span className="font-bold">{houses.length}</span>
+                <span className="text-xs font-semibold text-slate-600">Total Houses</span>
+                <span className="text-sm font-extrabold text-slate-900">{houses.length}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Active</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700 font-bold">
-                  {activeHousesCount}
+                <span className="text-xs font-semibold text-slate-600">Active</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 text-[10px] font-bold h-5 px-2 border-green-200">
+                  {activeHouses}
                 </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Maintenance</span>
-                <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 font-bold">
+                <span className="text-xs font-semibold text-slate-600">Maintenance</span>
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-[10px] font-bold h-5 px-2 border-amber-200">
                   {houses.filter((h) => h.status === "maintenance").length}
                 </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Inactive</span>
-                <Badge variant="secondary" className="bg-gray-100 font-bold">
+                <span className="text-xs font-semibold text-slate-600">Inactive</span>
+                <Badge variant="secondary" className="bg-slate-100 text-slate-600 text-[10px] font-bold h-5 px-2 border-slate-200">
                   {houses.filter((h) => h.status === "inactive").length}
                 </Badge>
               </div>
             </div>
-            <Button asChild variant="outline" className="w-full mt-4 font-bold" size="sm">
+            <Button asChild variant="outline" className="w-full mt-4 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
               <Link href="/dashboard/master-data">Manage Houses</Link>
             </Button>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+              <Users className="h-3.5 w-3.5 text-slate-500 opacity-70" />
               Contacts
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Total Suppliers</span>
-                <span className="font-bold">{suppliers.length}</span>
+                <span className="text-xs font-semibold text-slate-600">Total Suppliers</span>
+                <span className="text-sm font-extrabold text-slate-900">{suppliers.length}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Feed Suppliers</span>
-                <span className="font-bold">{suppliers.filter((s) => s.type === "feed").length}</span>
+                <span className="text-xs font-semibold text-slate-600">Feed Suppliers</span>
+                <span className="text-xs font-extrabold text-slate-700">{suppliers.filter((s) => s.type === "feed").length}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Medicine Suppliers</span>
-                <span className="font-bold">{suppliers.filter((s) => s.type === "medicine").length}</span>
+                <span className="text-xs font-semibold text-slate-600">Medicine Suppliers</span>
+                <span className="text-xs font-extrabold text-slate-700">{suppliers.filter((s) => s.type === "medicine").length}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground font-medium">Total Buyers</span>
-                <span className="font-bold">{buyers.length}</span>
+                <span className="text-xs font-semibold text-slate-600">Total Buyers</span>
+                <span className="text-sm font-extrabold text-slate-900">{buyers.length}</span>
               </div>
             </div>
-            <Button asChild variant="outline" className="w-full mt-4 font-bold" size="sm">
+            <Button asChild variant="outline" className="w-full mt-4 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
               <Link href="/dashboard/master-data">Manage Contacts</Link>
             </Button>
           </CardContent>
         </Card>
 
         {canAccessFinance(user) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Inventory Status
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                <Package className="h-3.5 w-3.5 text-slate-500 opacity-70" />
+                Inventory
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground font-medium">Total Items</span>
-                  <span className="font-bold">{items.length}</span>
+                  <span className="text-xs font-semibold text-slate-600">Total Items</span>
+                  <span className="text-sm font-extrabold text-slate-900">{items.length}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground font-medium">Feed Stock</span>
-                  <span className="font-bold">{feedLeftData.totalFeedStock.toLocaleString()} kg</span>
+                  <span className="text-xs font-semibold text-slate-600">Feed Types</span>
+                  <span className="text-xs font-extrabold text-slate-700">
+                    {items.filter((i) => i.category === "feed-raw" || i.category === "feed-finished").length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-slate-600">Medicines</span>
+                  <span className="text-xs font-extrabold text-slate-700">
+                    {items.filter((i) => i.category === "medicine" || i.category === "vaccine").length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-slate-600">Feed Stock</span>
+                  <span className="text-xs font-extrabold text-slate-700">{feedLeftData.totalFeedStock.toLocaleString()} kg</span>
                 </div>
                 <div className="mt-2 p-2 bg-slate-50 rounded border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Estimated Duration</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold">{feedLeftData.daysLeft} Days left</span>
-                    <Badge className={feedLeftData.daysLeft < 3 ? 'bg-red-500' : 'bg-green-500'}>
-                      {feedLeftData.daysLeft < 3 ? 'Low' : 'Healthy'}
-                    </Badge>
-                  </div>
-                  <Progress value={Math.min((feedLeftData.daysLeft / 7) * 100, 100)} className="h-1.5 mt-2" />
+                  <p className="text-[8px] font-extrabold text-slate-400 uppercase mb-0.5">Estimated Duration</p>
+                  <p className="text-sm font-black text-slate-900">
+                    {feedLeftData.daysLeft} <span className="text-[10px] font-bold text-slate-500 uppercase">Days of feed left</span>
+                  </p>
+                  <Progress value={Math.min((feedLeftData.daysLeft / 7) * 100, 100)} className={`h-1 mt-1 ${feedLeftData.daysLeft < 3 ? 'bg-red-100' : 'bg-green-100'}`} />
                 </div>
               </div>
-              <Button asChild variant="outline" className="w-full mt-4 font-bold" size="sm">
+              <Button asChild variant="outline" className="w-full mt-3 h-8 text-[11px] font-bold bg-white shadow-sm border-slate-200 text-slate-700" size="sm">
                 <Link href="/dashboard/inventory">View Inventory</Link>
               </Button>
             </CardContent>
@@ -603,31 +632,30 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Performance Trend (Last 14 Days)</CardTitle>
-            <CardDescription>Daily mortality rates across all active batches</CardDescription>
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4 shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Mortality Trend (Last 14 Days)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full mt-4">
+          <CardContent className="p-4">
+            <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={mortalityTrendData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: "bold" }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: "bold" }} />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }} />
                   <Tooltip
-                    contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "12px" }}
+                    contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "10px", fontWeight: "bold" }}
                   />
-                  <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                  <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                   <Line
                     type="monotone"
                     dataKey="mortalityPercent"
                     name="Daily Mortality %"
                     stroke="#ef4444"
                     strokeWidth={3}
-                    dot={{ r: 4, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    dot={{ r: 3, fill: "#ef4444", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 5, strokeWidth: 0 }}
                   />
                   <Line
                     type="step"
@@ -637,6 +665,7 @@ export default function DashboardPage() {
                     strokeWidth={1}
                     strokeDasharray="5 5"
                     dot={false}
+                    activeDot={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -644,21 +673,20 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Activity Summary</CardTitle>
-            <CardDescription>Daily log recording status</CardDescription>
+        <Card className="col-span-3 shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Activity Summary</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center pt-6">
-            <div className="relative h-[180px] w-[180px]">
+          <CardContent className="flex flex-col items-center justify-center pt-6 p-4">
+            <div className="relative h-[160px] w-[160px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={progressData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={65}
-                    outerRadius={85}
+                    innerRadius={55}
+                    outerRadius={75}
                     paddingAngle={5}
                     dataKey="value"
                     startAngle={90}
@@ -670,48 +698,47 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-4xl font-black text-slate-900 tracking-tighter">{logsToday}</span>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">OF {totalActiveHouses} LOGS</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tighter">{logsToday}</span>
+                <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest">OF {totalActiveHouses} LOGS</span>
               </div>
             </div>
-            <div className="mt-6 text-center">
-              <p className="text-sm font-bold uppercase tracking-tight">Log Completion</p>
-              <p className="text-xs text-muted-foreground mt-1">Record all active houses by EOD</p>
+            <div className="mt-4 text-center">
+              <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tight">Daily Log Completion</p>
+              <p className="text-[9px] text-slate-500 font-medium">Record all active houses by EOD</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Feed Consumption vs. Cumulative Mortality %</CardTitle>
-          <CardDescription>Correlation between feed input and batch mortality</CardDescription>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Feed Consumption vs. Cumulative Mortality %</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[350px] w-full mt-4">
+        <CardContent className="p-4">
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={feedVsGrowthData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: "bold" }} dy={10} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }} dy={10} />
                 <YAxis
                   yAxisId="left"
                   orientation="left"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 10, fill: "#64748b", fontWeight: "bold" }}
+                  tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 10, fill: "#64748b", fontWeight: "bold" }}
+                  tick={{ fontSize: 9, fill: "#64748b", fontWeight: "bold" }}
                 />
                 <Tooltip
-                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "12px" }}
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "10px", fontWeight: "bold" }}
                 />
-                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
-                <Bar yAxisId="left" dataKey="feedBags" name="Feed Bags" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                <Bar yAxisId="left" dataKey="feedBags" name="Feed Bags" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} />
                 <Line
                   yAxisId="right"
                   type="monotone"
@@ -719,7 +746,7 @@ export default function DashboardPage() {
                   name="Mortality %"
                   stroke="#ef4444"
                   strokeWidth={2}
-                  dot={{ r: 4, fill: "#ef4444" }}
+                  dot={{ r: 3, fill: "#ef4444" }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -727,22 +754,22 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Button asChild variant="outline" className="w-full h-12 font-bold text-base shadow-sm">
+        <CardContent className="p-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Button asChild variant="outline" className="w-full h-8 text-[10px] font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">
               <Link href="/dashboard/daily-logs">Add Daily Log</Link>
             </Button>
-            <Button asChild variant="outline" className="w-full h-12 font-bold text-base shadow-sm">
+            <Button asChild variant="outline" className="w-full h-10 text-xs font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">
               <Link href="/dashboard/inventory">Stock Movement</Link>
             </Button>
-            <Button asChild variant="outline" className="w-full h-12 font-bold text-base shadow-sm">
+            <Button asChild variant="outline" className="w-full h-10 text-xs font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">
               <Link href="/dashboard/finance">Add Transaction</Link>
             </Button>
-            <Button asChild variant="outline" className="w-full h-12 font-bold text-base shadow-sm">
+            <Button asChild variant="outline" className="w-full h-10 text-xs font-extrabold bg-white shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary transition-all">
               <Link href="/dashboard/master-data">Master Data</Link>
             </Button>
           </div>

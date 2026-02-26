@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useMasterData } from "@/lib/master-data-context"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory } from "@/lib/inventory-context"
+import { toDateKey } from "@/lib/daily-logs-context"
 import { getTodayDate, getFirstDayOfYear, getLastDayOfYear } from "@/lib/date-utils"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { formatIndianDate } from "@/lib/utils"
 
 export default function SalesPage() {
   const { buyers } = useMasterData()
@@ -50,18 +52,16 @@ export default function SalesPage() {
     remarks: "",
   })
 
-  const filteredSales =
-    selectedBuyerId === "all"
-      ? sales
-      : sales.filter((s) => s.buyerId === selectedBuyerId)
+  const filteredSales = (sales || [])
+    .filter((s) => selectedBuyerId === "all" || s.buyerId === selectedBuyerId)
 
-  const totalSales = sales.reduce((sum, s) => sum + s.totalValue, 0)
-  const totalBirdsSold = sales.reduce((sum, s) => sum + s.birds, 0)
-  const uniqueBuyers = new Set(sales.map((s) => s.buyerId)).size
+  const totalSales = (sales || []).reduce((sum, s) => sum + (s.totalValue || 0), 0)
+  const totalBirdsSold = (sales || []).reduce((sum, s) => sum + (s.birds || 0), 0)
+  const uniqueBuyers = new Set((sales || []).map((s) => s.buyerId)).size
 
-  const feedPurchaseExpenses = transactions
+  const feedPurchaseExpenses = (transactions || [])
     .filter((t) => t.type === "expense" && t.category === "Feed Purchase")
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
   const netRevenue = totalSales - feedPurchaseExpenses
 
   const liveWeightKg =
@@ -191,7 +191,7 @@ export default function SalesPage() {
   const handleDeleteSale = async (sale: { id: string; buyerId: string; date: string; birds: number; totalValue: number; financeTransactionId?: string }) => {
     const buyer = buyers.find((b) => b.id === sale.buyerId)
     const name = buyer ? buyer.name : "Unknown"
-    const msg = `Delete sale to ${name} on ${new Date(sale.date).toLocaleDateString()}?\n\nThis will:\n- Remove ${sale.birds} birds from sales\n- Remove ₹${sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })} from finance income`
+    const msg = `Delete sale to ${name} on ${formatIndianDate(sale.date)}?\n\nThis will:\n- Remove ${sale.birds} birds from sales\n- Remove ₹${sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })} from finance income`
     if (!confirm(msg)) return
     try {
       if (sale.financeTransactionId) await deleteTransaction(sale.financeTransactionId)
@@ -208,51 +208,51 @@ export default function SalesPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Sales</h1>
-          <p className="text-muted-foreground mt-1">Record and manage broiler sales</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Sales</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Record and manage broiler sales</p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Buyers</CardTitle>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Buyers</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{uniqueBuyers}</div>
-            <p className="text-xs text-muted-foreground">Buyers in system</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{uniqueBuyers}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Buyers in system</p>
           </CardContent>
         </Card>
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Sales</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">₹{totalSales.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total sales value</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-blue-600 tracking-tight">₹{totalSales.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Total sales value</p>
           </CardContent>
         </Card>
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Sales Entries</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Entries</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{sales.length}</div>
-            <p className="text-xs text-muted-foreground">Sales entries</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{(sales || []).length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Sales entries recorded</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
+      <div className="space-y-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
             <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-2">
-                <CardTitle>Sales</CardTitle>
-                <CardDescription>All sales with buyer, quantity, and value details</CardDescription>
+              <div>
+                <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Sales History</CardTitle>
+                <CardDescription className="text-[9px] font-medium text-slate-400">Buyer, quantity, and value details</CardDescription>
               </div>
               <Dialog
                 open={isSaleDialogOpen}
@@ -262,8 +262,8 @@ export default function SalesPage() {
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button onClick={startAddNewSale}>
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button size="sm" className="h-8 text-xs font-bold" onClick={startAddNewSale}>
+                    <Plus className="h-4 w-4 mr-1.5" />
                     Add Sale
                   </Button>
                 </DialogTrigger>
@@ -340,12 +340,12 @@ export default function SalesPage() {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-6">
+          <CardContent className="p-0">
+            <div className="flex items-center gap-4 py-1.5 px-3 bg-slate-50/30 border-b">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">Buyer:</label>
+                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-tight">Filter Buyer:</label>
                 <Select value={selectedBuyerId} onValueChange={setSelectedBuyerId}>
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-[180px] h-7 text-[11px] bg-white font-medium">
                     <SelectValue placeholder="All buyers" />
                   </SelectTrigger>
                   <SelectContent>
@@ -363,13 +363,13 @@ export default function SalesPage() {
             </div>
 
             {loading ? (
-              <div className="text-center py-12">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
-                <p className="text-muted-foreground mt-4">Loading sales...</p>
+              <div className="text-center py-8">
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                <p className="text-xs text-muted-foreground mt-3 font-medium">Loading sales...</p>
               </div>
             ) : filteredSales.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground mb-4">No sales recorded yet</p>
+              <div className="text-center py-8">
+                <p className="text-xs text-muted-foreground mb-3 font-medium">No sales recorded yet</p>
                 <Button onClick={startAddNewSale}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Sale
@@ -379,46 +379,46 @@ export default function SalesPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Buyer</TableHead>
-                      <TableHead className="text-right">Birds</TableHead>
-                      <TableHead className="text-right">Live Wt (kg)</TableHead>
-                      <TableHead className="text-right">Rate (₹/kg)</TableHead>
-                      <TableHead className="text-right">Total (₹)</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
+                    <TableRow className="h-10 bg-slate-50/50">
+                      <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight">Buyer</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Birds</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Live Wt</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Rate</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Total</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {[...filteredSales]
-                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
                       .map((sale) => {
                         const buyer = buyers.find((b) => b.id === sale.buyerId)
                         const liveWeight = sale.birds * sale.avgWeightKg
                         return (
-                          <TableRow key={sale.id}>
-                            <TableCell className="text-sm">
-                              {new Date(sale.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                          <TableRow key={sale.id} className="h-11">
+                            <TableCell className="text-xs py-1">
+                              {formatIndianDate(sale.date)}
                             </TableCell>
-                            <TableCell>{buyer ? buyer.name : "Buyer Deleted"}</TableCell>
-                            <TableCell className="text-right">{sale.birds.toLocaleString("en-IN")}</TableCell>
-                            <TableCell className="text-right">{liveWeight.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">₹{sale.ratePerKg.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium">
+                            <TableCell className="text-[11px] font-medium py-1">{buyer ? buyer.name : "Buyer Deleted"}</TableCell>
+                            <TableCell className="text-xs text-right py-1">{sale.birds.toLocaleString("en-IN")}</TableCell>
+                            <TableCell className="text-xs text-right py-1">{liveWeight.toFixed(2)}kg</TableCell>
+                            <TableCell className="text-xs text-right py-1">₹{sale.ratePerKg.toFixed(2)}</TableCell>
+                            <TableCell className="text-xs text-right font-bold py-1 text-slate-900">
                               ₹{sale.totalValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                             </TableCell>
-                            <TableCell className="text-center">
-                              <div className="flex gap-2 justify-center">
-                                <Button variant="outline" size="sm" onClick={() => handleEditSale(sale)}>
-                                  <Edit className="h-4 w-4" />
+                            <TableCell className="py-1">
+                              <div className="flex gap-1.5 justify-center">
+                                <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => handleEditSale(sale)}>
+                                  <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale)}>
-                                  <Trash2 className="h-4 w-4" />
+                                <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteSale(sale)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                                 {sale.financeTransactionId && (
                                   <Link href={`/dashboard/finance?transactionId=${sale.financeTransactionId}`}>
-                                    <Button variant="ghost" size="sm" title="View in Finance" asChild>
-                                      <ExternalLink className="h-4 w-4 text-green-600" />
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View in Finance">
+                                      <ExternalLink className="h-3.5 w-3.5 text-green-600" />
                                     </Button>
                                   </Link>
                                 )}

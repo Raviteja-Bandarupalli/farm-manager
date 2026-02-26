@@ -478,11 +478,11 @@ export default function DailyLogsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Daily Logs</h1>
-          <p className="text-muted-foreground mt-1">Track daily activities and metrics for your broiler flocks</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Daily Logs</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Track daily metrics for your flocks</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={downloadPDF} variant="outline" size="sm" className="h-8 text-xs font-bold" disabled={sortedLogs.length === 0}>
@@ -883,22 +883,21 @@ export default function DailyLogsPage() {
       </div>
 
       {weeklyFeeds.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Feed Entries</CardTitle>
-            <CardDescription>Recorded weekly feed consumption and weights</CardDescription>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Weekly Feed Entries</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>House</TableHead>
-                    <TableHead>Week Start</TableHead>
-                    <TableHead>Week End</TableHead>
-                    <TableHead className="text-right">Total Feed (kg)</TableHead>
-                    <TableHead className="text-right">Avg Weight (kg)</TableHead>
-                    {user?.role === "owner" && <TableHead className="text-center">Actions</TableHead>}
+                  <TableRow className="h-8 bg-slate-50/50">
+                    <TableHead className="text-[10px] h-8">House</TableHead>
+                    <TableHead className="text-[10px] h-8">Week Start</TableHead>
+                    <TableHead className="text-[10px] h-8">Week End</TableHead>
+                    <TableHead className="text-[10px] h-8 text-right">Total Feed (kg)</TableHead>
+                    <TableHead className="text-[10px] h-8 text-right">Avg Weight (kg)</TableHead>
+                    {user?.role === "owner" && <TableHead className="text-center text-[10px] h-8">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -910,12 +909,12 @@ export default function DailyLogsPage() {
                     })
                     .sort((a, b) => b.weekEnd.localeCompare(a.weekEnd))
                     .map((feed) => (
-                    <TableRow key={feed.id}>
-                      <TableCell>{getHouseName(feed.houseId)}</TableCell>
-                      <TableCell>{formatIndianDate(feed.weekStart)}</TableCell>
-                      <TableCell>{formatIndianDate(feed.weekEnd)}</TableCell>
-                      <TableCell className="font-semibold text-right">{(feed.totalFeedKg || 0).toFixed(1)} kg</TableCell>
-                      <TableCell className="font-semibold text-right">{(feed.averageWeightKg || 0).toFixed(2)} kg</TableCell>
+                      <TableRow key={feed.id} className="h-9">
+                        <TableCell className="text-[11px] py-1">{getHouseName(feed.houseId)}</TableCell>
+                        <TableCell className="text-[11px] py-1">{formatIndianDate(feed.weekStart)}</TableCell>
+                        <TableCell className="text-[11px] py-1">{formatIndianDate(feed.weekEnd)}</TableCell>
+                        <TableCell className="text-[11px] py-1 font-semibold text-right">{(feed.totalFeedKg || 0).toFixed(1)} kg</TableCell>
+                        <TableCell className="text-[11px] py-1 font-semibold text-right">{(feed.averageWeightKg || 0).toFixed(2)} kg</TableCell>
                         {user?.role === "owner" && (
                           <TableCell className="text-center py-1">
                             <Button
@@ -941,46 +940,46 @@ export default function DailyLogsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle>Daily Logs History</CardTitle>
-            <CardDescription>View recorded daily metrics</CardDescription>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/80">
+          <div className="flex flex-col">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Daily Logs History</CardTitle>
+            <CardDescription className="text-[9px] font-medium text-slate-400 hidden sm:block">View recorded daily metrics</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <div className="flex items-center gap-1 bg-background border rounded-md px-2 h-9">
-              <span className="text-xs font-medium text-muted-foreground">From:</span>
+            <Filter className="h-3 w-3 text-slate-400" />
+            <div className="flex items-center gap-1 bg-white border rounded-md px-1.5 h-7">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">From:</span>
               <input
                 type="date"
-                className="text-xs border-none focus:ring-0 p-0 w-28 bg-transparent outline-none"
+                className="text-[10px] border-none focus:ring-0 p-0 w-24 bg-transparent outline-none"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
-              <span className="text-xs font-medium text-muted-foreground ml-1">To:</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">To:</span>
               <input
                 type="date"
-                className="text-xs border-none focus:ring-0 p-0 w-28 bg-transparent outline-none"
+                className="text-[10px] border-none focus:ring-0 p-0 w-24 bg-transparent outline-none"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
               />
               {(startDate || endDate) && (
                 <button
                   onClick={() => { setStartDate(""); setEndDate(""); }}
-                  className="text-xs font-medium text-destructive ml-1 hover:underline"
+                  className="text-[9px] font-bold text-red-500 uppercase ml-1 hover:underline"
                 >
                   Clear
                 </button>
               )}
             </div>
             <Select value={filterHouse} onValueChange={setFilterHouse}>
-              <SelectTrigger className="h-9 w-[150px]">
+              <SelectTrigger className="h-7 w-[110px] text-[11px] font-medium bg-white">
                 <SelectValue placeholder="All Houses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Houses</SelectItem>
+                <SelectItem value="all" className="text-xs">All Houses</SelectItem>
                 {activeHouses.map((house) => (
-                  <SelectItem key={house.id} value={house.id}>
+                  <SelectItem key={house.id} value={house.id} className="text-[10px]">
                     {house.name} - {getFarmName(house.id)}
                   </SelectItem>
                 ))}
@@ -988,18 +987,18 @@ export default function DailyLogsPage() {
             </Select>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-fixed w-full border-collapse">
               <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-center">Farm/House</TableHead>
-                  <TableHead>Mortality</TableHead>
-                  <TableHead>Cum. Mort %</TableHead>
-                  <TableHead>Feed Type</TableHead>
-                  <TableHead>Closing Birds</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                <TableRow className="bg-slate-50/50 h-9">
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-[11px] align-middle uppercase tracking-tighter">Date</TableHead>
+                  <TableHead className="w-[20%] font-bold text-slate-700 text-xs text-center align-middle">Farm/House</TableHead>
+                  <TableHead className="w-[10%] font-bold text-slate-700 text-xs align-middle">Mortality</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Cum. Mort %</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Feed Type</TableHead>
+                  <TableHead className="w-[15%] font-bold text-slate-700 text-xs align-middle">Closing</TableHead>
+                  <TableHead className="w-[10%] font-bold text-slate-700 text-xs text-center align-middle">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1011,11 +1010,11 @@ export default function DailyLogsPage() {
                   </TableRow>
                 ) : (
                   sortedLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap">
+                    <TableRow key={log.id} className="hover:bg-slate-50 transition-colors h-11">
+                      <TableCell className="whitespace-nowrap align-middle py-0 text-xs">
                         {formatIndianDate(log.date)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle py-0">
                         <div className="flex flex-col items-center justify-center text-center leading-none">
                           <div className="text-[9px] font-bold text-slate-700 uppercase tracking-tighter">
                             {getFarmName(log.houseId)}
@@ -1025,21 +1024,21 @@ export default function DailyLogsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="align-middle py-0 text-xs font-medium">
                         {log.mortality}
                       </TableCell>
-                      <TableCell>
-                        <span className={`font-semibold ${log.cumulativeMortalityPercent > 5 ? 'text-red-600' : ''}`}>
+                      <TableCell className="align-middle py-0">
+                        <span className={`text-xs font-semibold ${log.cumulativeMortalityPercent > 5 ? 'text-red-600' : 'text-slate-600'}`}>
                           {log.cumulativeMortalityPercent.toFixed(2)}%
                         </span>
                       </TableCell>
-                      <TableCell className="text-slate-600 truncate">
+                      <TableCell className="align-middle py-0 text-[11px] text-slate-600 truncate">
                         {getFeedTypeName(log.feedTypeId)}
                       </TableCell>
-                      <TableCell className="font-bold">
+                      <TableCell className="align-middle py-0 text-xs font-bold text-slate-900">
                         {log.closingBirds.toLocaleString("en-IN")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle py-0">
                         <div className="flex items-center justify-center gap-1.5">
                           {user?.role === "owner" && (
                             <>
