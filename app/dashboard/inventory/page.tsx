@@ -276,10 +276,10 @@ export default function InventoryPage() {
   return (
     <div className="space-y-3">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between py-1">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Inventory Dashboard</h1>
-          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Centralized Stock & Mixing Control</p>
+          <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Centralized Stock & Mixing Control</p>
         </div>
         <div className="flex gap-2">
           {user?.role === "owner" && (
@@ -554,36 +554,36 @@ export default function InventoryPage() {
 
       {/* Dynamic Scoreboard */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Card className="shadow-sm border-slate-200/60 overflow-hidden">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Total Stock Value</span>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Stock Value</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className="text-xl font-black tracking-tight text-slate-900">₹{displayTotalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{selectedFarmId ? farms.find(f => f.id === selectedFarmId)?.name : "Across all locations"}</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/60 overflow-hidden">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Maize Stock</span>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Maize Stock</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className="text-xl font-black tracking-tight text-slate-900">{displayMaize.toLocaleString()} <span className="text-xs">KG</span></div>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(displayMaize / 50).toFixed(0)} Bags</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/60 overflow-hidden">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Soya Stock</span>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Soya Stock</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className="text-xl font-black tracking-tight text-slate-900">{displaySoya.toLocaleString()} <span className="text-xs">KG</span></div>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(displaySoya / 50).toFixed(0)} Bags</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200/60 overflow-hidden">
-          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Days Stock Left</span>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Stock Left</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className={cn("text-xl font-black tracking-tight", Number(daysLeft) < 3 ? "text-red-600 animate-pulse" : "text-slate-900")}>
@@ -595,26 +595,24 @@ export default function InventoryPage() {
       </div>
 
       {/* Main Content Ledger */}
-      <Card className="shadow-sm border-slate-200/60 mt-2">
-        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+      <Card className="shadow-sm border-none mt-4">
+        <CardHeader className="py-3 px-4 border-b">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Filter by Farm</label>
-                <Select value={selectedFarmId || "all"} onValueChange={(v) => setSelectedFarmId(v === "all" ? null : v)}>
-                  <SelectTrigger className="w-48 h-8 bg-white border-slate-200 text-[11px] font-bold">
-                    <SelectValue placeholder="All Locations" />
-                  </SelectTrigger>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Filter by Farm</label>
+              <Select value={selectedFarmId || "all"} onValueChange={(v) => setSelectedFarmId(v === "all" ? null : v)}>
+                <SelectTrigger className="w-64 h-9 bg-slate-50 border-slate-200 text-xs font-bold">
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-xs font-bold">All Locations</SelectItem>
                   {farms.map((f) => (<SelectItem key={f.id} value={f.id} className="text-xs font-bold">{f.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
-            </div>
             <div className="flex flex-col items-end">
-              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Stock Movement Ledger</CardTitle>
-              <CardDescription className="text-[9px] font-medium text-slate-400">Unified history of purchases & mixing</CardDescription>
+              <CardTitle className="text-base font-bold">Stock Movement Ledger</CardTitle>
+              <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Unified history of purchases & mixing</CardDescription>
             </div>
           </div>
         </CardHeader>
