@@ -190,6 +190,7 @@ export default function InventoryPage() {
   const displayMaize = filteredItems.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
   const displaySoya = filteredItems.filter(i => i.code === "SOYA").reduce((sum, i) => sum + Number(i.currentStock), 0)
   const displayBrokenRice = filteredItems.filter(i => i.code === "BROKENRICE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const displayOil = filteredItems.filter(i => i.code === "OIL").reduce((sum, i) => sum + Number(i.currentStock), 0)
 
   // Calculate 7-day average mixing for alerts
   const getAverageDailyMixing = (farmId: string | null, code: string) => {
@@ -212,7 +213,7 @@ export default function InventoryPage() {
   }
 
   const getDaysLeft = (farmId: string | null) => {
-    const ingredients = ["MAIZE", "SOYA", "BROKENRICE"]
+    const ingredients = ["MAIZE", "SOYA", "BROKENRICE", "OIL"]
     let minDays = 99
 
     ingredients.forEach(code => {
@@ -553,19 +554,19 @@ export default function InventoryPage() {
       )}
 
       {/* Dynamic Scoreboard */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         <Card className="shadow-sm border-none">
           <CardHeader className="py-1.5 px-3 border-b">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Stock Value</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Value</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className="text-xl font-black tracking-tight text-slate-900">₹{displayTotalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{selectedFarmId ? farms.find(f => f.id === selectedFarmId)?.name : "Across all locations"}</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">{selectedFarmId ? farms.find(f => f.id === selectedFarmId)?.name : "All Farms"}</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm border-none">
           <CardHeader className="py-1.5 px-3 border-b">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Maize Stock</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Maize</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className="text-xl font-black tracking-tight text-slate-900">{displayMaize.toLocaleString()} <span className="text-xs">KG</span></div>
@@ -574,7 +575,7 @@ export default function InventoryPage() {
         </Card>
         <Card className="shadow-sm border-none">
           <CardHeader className="py-1.5 px-3 border-b">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Soya Stock</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Soya</span>
           </CardHeader>
           <CardContent className="p-2.5">
             <div className="text-xl font-black tracking-tight text-slate-900">{displaySoya.toLocaleString()} <span className="text-xs">KG</span></div>
@@ -583,13 +584,31 @@ export default function InventoryPage() {
         </Card>
         <Card className="shadow-sm border-none">
           <CardHeader className="py-1.5 px-3 border-b">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Stock Left</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Broken Rice</span>
           </CardHeader>
           <CardContent className="p-2.5">
-            <div className={cn("text-xl font-black tracking-tight", Number(daysLeft) < 3 ? "text-red-600 animate-pulse" : "text-slate-900")}>
+            <div className="text-xl font-black tracking-tight text-slate-900">{displayBrokenRice.toLocaleString()} <span className="text-xs">KG</span></div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Clean Rice</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Oil Stock</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">{displayOil.toLocaleString()} <span className="text-xs">Ltr</span></div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Cooking Oil</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Left</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className={cn("text-xl font-black tracking-tight", (Number(daysLeft) < 3 && daysLeft !== "-") ? "text-red-600 animate-pulse" : "text-slate-900")}>
               {daysLeft} <span className="text-xs">DAYS</span>
             </div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Based on 7-day mix avg</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Mix Avg</p>
           </CardContent>
         </Card>
       </div>

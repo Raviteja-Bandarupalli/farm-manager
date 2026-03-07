@@ -6,8 +6,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory } from "@/lib/inventory-context"
-import { toDateKey } from "@/lib/daily-logs-context"
-import { formatIndianDate } from "@/lib/utils"
+import { formatIndianDate, toDateKey } from "@/lib/utils"
 import { getTodayDate, getFirstDayOfMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -169,7 +168,7 @@ export default function FinancePage() {
   const sortedTransactions = [...transactions]
     .filter((t) => {
       const tTime = toDateKey(t.date)
-      return tTime >= startTime && tTime <= endTime
+      return tTime >= toDateKey(dateRange.start) && tTime <= toDateKey(dateRange.end)
     })
     .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
 

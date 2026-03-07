@@ -1,0 +1,17 @@
+
+> farm-manager@1.0.0 dev
+> next dev
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.2:3000
+
+ ✓ Starting...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ⚠ Minimum recommended TypeScript version is v5.1.0, older versions can potentially be incompatible with Next.js. Detected: 5.0.2
+ ✓ Ready in 1555ms
+ ○ Compiling /dashboard ...
+Missing Supabase environment variables - database features will be disabled
+ GET /dashboard 200 in 9.5s (compile: 8.3s, render: 1226ms)
+ GET /login 200 in 703ms (compile: 645ms, render: 58ms)
+ GET /login 200 in 110ms (compile: 5ms, render: 105ms)

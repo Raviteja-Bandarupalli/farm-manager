@@ -42,8 +42,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", show: true },
     { icon: Database, label: "Master Data", href: "/dashboard/master-data", show: canAccessMasterData(user) },
-    { icon: ClipboardList, label: "Daily Logs", href: "/dashboard/daily-logs", show: true },
-    { icon: Utensils, label: "Daily Feed Log", href: "/dashboard/feed-logs", show: true },
+    { icon: ClipboardList, label: "Production Logs", href: "/dashboard/daily-logs", show: true },
+    { icon: Utensils, label: "Feed Mixing", href: "/dashboard/feed-logs", show: true },
     { icon: Package, label: "Inventory", href: "/dashboard/inventory", show: canAccessInventory(user) },
     { icon: Wallet, label: "Sales", href: "/dashboard/sales", show: true },
     { icon: DollarSign, label: "Finance", href: "/dashboard/finance", show: canAccessFinance(user) },

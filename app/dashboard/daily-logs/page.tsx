@@ -8,8 +8,8 @@ import { useAuth } from "@/lib/auth-context"
 import { useWorkers } from "@/lib/workers-context"
 import { useBatchSections } from "@/lib/batch-sections-context"
 import { useWeeklyFeed } from "@/lib/weekly-feed-context"
-import { useDailyLogs, type DailyLog, toDateKey } from "@/lib/daily-logs-context"
-import { formatIndianDate } from "@/lib/utils"
+import { useDailyLogs, type DailyLog } from "@/lib/daily-logs-context"
+import { formatIndianDate, toDateKey } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -692,7 +692,7 @@ export default function DailyLogsPage() {
                           <p className="text-sm text-muted-foreground">No sections found for this batch.</p>
                         )}
                         {batchSections.map((section, index) => {
-                          const worker = getWorkerById(section.workerId || "")
+                          const worker = getWorkerById(section.workerId)
                           const mortalityValue =
                             mortalityBySection[section.id] !== undefined && mortalityBySection[section.id] !== null
                               ? String(mortalityBySection[section.id])

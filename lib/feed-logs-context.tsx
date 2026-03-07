@@ -16,6 +16,7 @@ export interface FeedLog {
   soyaKg: number
   brokenRiceKg: number
   suppl5Kg: number
+  oilLiters: number
   totalCost: number
   distribution: Record<string, number> // {houseId: kg}
   createdAt: string
@@ -65,6 +66,7 @@ export function FeedLogsProvider({ children }: { children: React.ReactNode }) {
       { code: "SOYA", qty: log.soyaKg },
       { code: "BROKENRICE", qty: log.brokenRiceKg },
       { code: "SUPPL-5", qty: log.suppl5Kg },
+      { code: "OIL", qty: log.oilLiters },
     ]
 
     let totalCost = 0
@@ -133,6 +135,7 @@ export function FeedLogsProvider({ children }: { children: React.ReactNode }) {
       { code: "SOYA", qty: log.soyaKg },
       { code: "BROKENRICE", qty: log.brokenRiceKg },
       { code: "SUPPL-5", qty: log.suppl5Kg },
+      { code: "OIL", qty: log.oilLiters },
     ]
 
     for (const ing of ingredients) {

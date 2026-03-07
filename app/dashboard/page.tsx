@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react"
 import { useMasterData } from "@/lib/master-data-context"
-import { useDailyLogs, toDateKey } from "@/lib/daily-logs-context"
+import { useDailyLogs } from "@/lib/daily-logs-context"
+import { toDateKey } from "@/lib/utils"
 import { useInventory } from "@/lib/inventory-context"
 import { useFinance } from "@/lib/finance-context"
 import { useBatch } from "@/lib/batch-context"

@@ -40,6 +40,7 @@ export default function FeedLogsPage() {
     soyaKg: "",
     brokenRiceKg: "",
     suppl5Kg: "",
+    oilLiters: "",
     distribution: {} as Record<string, string>
   })
 
@@ -52,19 +53,20 @@ export default function FeedLogsPage() {
       if (total > 0) {
         setFormData(prev => ({
           ...prev,
-          maizeKg: (total * 0.6).toFixed(1),
+          maizeKg: (total * 0.58).toFixed(1),
           soyaKg: (total * 0.25).toFixed(1),
           brokenRiceKg: (total * 0.1).toFixed(1),
           suppl5Kg: (total * 0.05).toFixed(1),
+          oilLiters: (total * 0.02).toFixed(1),
         }))
       }
     }
   }, [formData.totalWeight])
 
-  const farmHouses = houses.filter(h => h.farmId === formData.farmId)
+  const farmHouses = houses.filter(h => h.farmId === formData.farmId && getActiveBatchByHouse(h.id))
 
   const currentDistributedTotal = Object.values(formData.distribution).reduce((sum, val) => sum + Number(val || 0), 0)
-  const totalMixInput = Number(formData.maizeKg || 0) + Number(formData.soyaKg || 0) + Number(formData.brokenRiceKg || 0) + Number(formData.suppl5Kg || 0)
+  const totalMixInput = Number(formData.maizeKg || 0) + Number(formData.soyaKg || 0) + Number(formData.brokenRiceKg || 0) + Number(formData.suppl5Kg || 0) + Number(formData.oilLiters || 0)
 
   const isDistributionValid = Math.abs(currentDistributedTotal - Number(formData.totalWeight)) < 0.1 && Math.abs(totalMixInput - Number(formData.totalWeight)) < 0.1
 
@@ -89,6 +91,7 @@ export default function FeedLogsPage() {
         soyaKg: Number(formData.soyaKg),
         brokenRiceKg: Number(formData.brokenRiceKg),
         suppl5Kg: Number(formData.suppl5Kg),
+        oilLiters: Number(formData.oilLiters),
         distribution: numericDistribution
       })
 
@@ -101,6 +104,7 @@ export default function FeedLogsPage() {
         soyaKg: "",
         brokenRiceKg: "",
         suppl5Kg: "",
+        oilLiters: "",
         distribution: {}
       })
     } catch (err) {
@@ -181,10 +185,11 @@ export default function FeedLogsPage() {
               {/* Ingredient Breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { id: 'maizeKg', label: 'Maize', icon: Wheat, color: 'text-amber-500' },
-                  { id: 'soyaKg', label: 'Soya', icon: Beef, color: 'text-orange-600' },
-                  { id: 'brokenRiceKg', label: 'Rice', icon: Droplet, color: 'text-blue-400' },
-                  { id: 'suppl5Kg', label: '5% Suppl', icon: FlaskConical, color: 'text-purple-500' },
+                  { id: 'maizeKg', label: 'Maize (KG)', icon: Wheat, color: 'text-amber-500' },
+                  { id: 'soyaKg', label: 'Soya (KG)', icon: Beef, color: 'text-orange-600' },
+                  { id: 'brokenRiceKg', label: 'Rice (KG)', icon: Droplet, color: 'text-blue-400' },
+                  { id: 'suppl5Kg', label: '5% Suppl (KG)', icon: FlaskConical, color: 'text-purple-500' },
+                  { id: 'oilLiters', label: 'Oil (Ltr)', icon: Droplet, color: 'text-yellow-600' },
                 ].map((item) => (
                   <div key={item.id} className="p-2 border rounded-md space-y-1 bg-slate-50">
                     <div className="flex items-center gap-1.5">
@@ -305,6 +310,7 @@ export default function FeedLogsPage() {
                 <TableHead className="text-[10px] font-extrabold uppercase text-right">Batch Weight</TableHead>
                 <TableHead className="text-[10px] font-extrabold uppercase text-right">Maize</TableHead>
                 <TableHead className="text-[10px] font-extrabold uppercase text-right">Soya</TableHead>
+                <TableHead className="text-[10px] font-extrabold uppercase text-right">Oil</TableHead>
                 <TableHead className="text-[10px] font-extrabold uppercase text-right pr-6 w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -326,6 +332,7 @@ export default function FeedLogsPage() {
                     <TableCell className="text-right text-xs font-black text-slate-900">{log.totalWeight.toLocaleString()} KG</TableCell>
                     <TableCell className="text-right text-[11px] font-medium text-slate-500">{log.maizeKg.toLocaleString()} KG</TableCell>
                     <TableCell className="text-right text-[11px] font-medium text-slate-500">{log.soyaKg.toLocaleString()} KG</TableCell>
+                    <TableCell className="text-right text-[11px] font-medium text-slate-500">{log.oilLiters?.toLocaleString() || 0} L</TableCell>
                     <TableCell className="text-right pr-6">
                       <Button
                         variant="ghost"
