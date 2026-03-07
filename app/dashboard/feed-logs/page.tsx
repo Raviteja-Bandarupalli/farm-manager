@@ -35,7 +35,6 @@ export default function FeedLogsPage() {
   const [formData, setFormData] = useState({
     farmId: "",
     date: getTodayDate(),
-    totalWeight: "",
     maizeKg: "",
     soyaKg: "",
     brokenRiceKg: "",
@@ -46,29 +45,14 @@ export default function FeedLogsPage() {
 
   const [filterFarm, setFilterFarm] = useState<string>("all")
 
-  // Auto-suggest logic
-  useEffect(() => {
-    if (formData.totalWeight && !formData.maizeKg && !formData.soyaKg) {
-      const total = Number(formData.totalWeight)
-      if (total > 0) {
-        setFormData(prev => ({
-          ...prev,
-          maizeKg: (total * 0.58).toFixed(1),
-          soyaKg: (total * 0.25).toFixed(1),
-          brokenRiceKg: (total * 0.1).toFixed(1),
-          suppl5Kg: (total * 0.05).toFixed(1),
-          oilLiters: (total * 0.02).toFixed(1),
-        }))
-      }
-    }
-  }, [formData.totalWeight])
+  // Calculate total automatically based on ingredients
+  const calculatedTotal = Number(formData.maizeKg || 0) + Number(formData.soyaKg || 0) + Number(formData.brokenRiceKg || 0) + Number(formData.suppl5Kg || 0) + Number(formData.oilLiters || 0)
 
   const farmHouses = houses.filter(h => h.farmId === formData.farmId && getActiveBatchByHouse(h.id))
 
   const currentDistributedTotal = Object.values(formData.distribution).reduce((sum, val) => sum + Number(val || 0), 0)
-  const totalMixInput = Number(formData.maizeKg || 0) + Number(formData.soyaKg || 0) + Number(formData.brokenRiceKg || 0) + Number(formData.suppl5Kg || 0) + Number(formData.oilLiters || 0)
 
-  const isDistributionValid = Math.abs(currentDistributedTotal - Number(formData.totalWeight)) < 0.1 && Math.abs(totalMixInput - Number(formData.totalWeight)) < 0.1
+  const isDistributionValid = calculatedTotal > 0 && Math.abs(currentDistributedTotal - calculatedTotal) < 0.1
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,7 +70,7 @@ export default function FeedLogsPage() {
       await addFeedLog({
         farmId: formData.farmId,
         date: formData.date,
-        totalWeight: Number(formData.totalWeight),
+        totalWeight: calculatedTotal,
         maizeKg: Number(formData.maizeKg),
         soyaKg: Number(formData.soyaKg),
         brokenRiceKg: Number(formData.brokenRiceKg),
@@ -99,7 +83,6 @@ export default function FeedLogsPage() {
       setFormData({
         farmId: "",
         date: getTodayDate(),
-        totalWeight: "",
         maizeKg: "",
         soyaKg: "",
         brokenRiceKg: "",
@@ -169,17 +152,11 @@ export default function FeedLogsPage() {
                 </div>
               </div>
 
-              <div className="space-y-1 bg-slate-900 p-4 rounded-lg">
+              <div className="space-y-1 bg-slate-900 p-4 rounded-lg shadow-inner">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Batch Weight (KG)</label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  className="h-12 text-2xl font-black bg-transparent border-none text-white focus-visible:ring-0 p-0"
-                  placeholder="0.0"
-                  value={formData.totalWeight}
-                  onChange={(e) => setFormData({...formData, totalWeight: e.target.value})}
-                  required
-                />
+                <div className="text-2xl font-black text-white">
+                  {calculatedTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                </div>
               </div>
 
               {/* Ingredient Breakdown */}
@@ -212,8 +189,8 @@ export default function FeedLogsPage() {
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between border-b pb-1">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">House Wise Distribution</h3>
-                    <span className={cn("text-[9px] font-bold uppercase", Math.abs(currentDistributedTotal - Number(formData.totalWeight)) < 0.1 ? "text-green-600" : "text-red-500")}>
-                      {currentDistributedTotal} / {formData.totalWeight || 0} KG
+                    <span className={cn("text-[9px] font-bold uppercase", Math.abs(currentDistributedTotal - calculatedTotal) < 0.1 ? "text-green-600" : "text-red-500")}>
+                      {currentDistributedTotal} / {calculatedTotal} KG
                     </span>
                   </div>
                   <div className="space-y-2">

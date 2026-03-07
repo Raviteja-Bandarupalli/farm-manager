@@ -61,7 +61,6 @@ function recalculateBatchLogs(
   batchId: string,
   allLogs: DailyLog[],
   batches: { id: string; initialBirds: number }[],
-  weeklyFeeds: { batchId: string; weekEnd: string; totalFeedKg: number }[],
   getFeedByHouse: (houseId: string, dateLimit?: string) => number,
 ): DailyLog[] {
   const batch = batches.find((b) => b.id === batchId)
@@ -181,7 +180,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       log.batchId,
       allLogs,
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
-      weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
       getFeedByHouse,
     )
 
@@ -236,7 +234,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       updated.batchId,
       allLogs,
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
-      weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
       getFeedByHouse,
     )
 
@@ -266,7 +263,6 @@ export function DailyLogsProvider({ children }: { children: React.ReactNode }) {
       log.batchId,
       remaining,
       batches.map((b) => ({ id: b.id, initialBirds: b.initialBirds })),
-      weeklyFeeds.map((f) => ({ batchId: f.batchId, weekEnd: f.weekEnd, totalFeedKg: f.totalFeedKg })),
       getFeedByHouse,
     )
     for (const r of recalc) {
