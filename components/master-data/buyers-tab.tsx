@@ -49,17 +49,23 @@ export function BuyersTab() {
   }
 
   return (
-    <div>
-      <div className="flex justify-end mb-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Buyers</h2>
+          <p className="text-[9px] font-medium text-slate-400">Manage customer and buyer contacts</p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
+              size="sm"
+              className="h-8 text-xs font-bold"
               onClick={() => {
                 setEditingId(null)
                 setFormData({ name: "", contact: "", address: "" })
               }}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Buyer
             </Button>
           </DialogTrigger>
@@ -101,9 +107,9 @@ export function BuyersTab() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {buyers.length === 0 ? (
-          <Card className="col-span-full">
+          <Card className="col-span-full shadow-sm">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground mb-4">No buyers added yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
@@ -114,20 +120,20 @@ export function BuyersTab() {
           </Card>
         ) : (
           buyers.map((buyer) => (
-            <Card key={buyer.id}>
-              <CardHeader>
-                <CardTitle>{buyer.name}</CardTitle>
-                <CardDescription>{buyer.contact}</CardDescription>
+            <Card key={buyer.id} className="shadow-sm">
+              <CardHeader className="py-2.5 px-4 border-b bg-slate-50/50">
+                <CardTitle className="text-sm font-bold">{buyer.name}</CardTitle>
+                <CardDescription className="text-xs">{buyer.contact}</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">{buyer.address}</p>
+              <CardContent className="p-4">
+                <p className="text-xs font-medium text-slate-500 mb-4 line-clamp-2 min-h-[2.5rem]">{buyer.address}</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(buyer)}>
-                    <Edit className="h-3 w-3 mr-1" />
+                  <Button variant="outline" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleEdit(buyer)}>
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(buyer.id)}>
-                    <Trash2 className="h-3 w-3 mr-1" />
+                  <Button variant="destructive" size="sm" className="h-8 text-xs font-bold flex-1" onClick={() => handleDelete(buyer.id)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                     Delete
                   </Button>
                 </div>

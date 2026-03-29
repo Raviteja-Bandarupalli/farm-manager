@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory } from "@/lib/inventory-context"
-import { formatIndianDate } from "@/lib/utils"
+import { formatIndianDate, toDateKey } from "@/lib/utils"
 import { getTodayDate, getFirstDayOfMonth } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -145,7 +145,12 @@ export default function FinancePage() {
   const incomeByCategory = getIncomeByCategory(dateRange.start, dateRange.end)
   const expensesByCategory = getExpensesByCategory(dateRange.start, dateRange.end)
 
-  const issuesInRange = issues.filter((issue) => issue.date >= dateRange.start && issue.date <= dateRange.end)
+  const startTime = toDateKey(dateRange.start)
+  const endTime = toDateKey(dateRange.end)
+  const issuesInRange = issues.filter((issue) => {
+    const issueTime = toDateKey(issue.date)
+    return issueTime >= startTime && issueTime <= endTime
+  })
   let feedCostFromIssues = 0
   let medCostFromIssues = 0
 
@@ -161,22 +166,27 @@ export default function FinancePage() {
   })
 
   const sortedTransactions = [...transactions]
-    .filter((t) => t.date >= dateRange.start && t.date <= dateRange.end)
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .filter((t) => {
+      const tTime = toDateKey(t.date)
+      return tTime >= toDateKey(dateRange.start) && tTime <= toDateKey(dateRange.end)
+    })
+    .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
 
   const formatINR = (amount: number) =>
     amount.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Finance Tracking</h1>
-          <p className="text-muted-foreground mt-1">Monitor income, expenses, and financial performance</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Finance Tracking</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Monitor income, expenses, and financial performance</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
+              size="sm"
+              className="h-8 text-xs font-bold"
               onClick={() => {
                 setEditingId(null)
                 setFormData({
@@ -189,7 +199,7 @@ export default function FinancePage() {
                 })
               }}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1.5" />
               Add Transaction
             </Button>
           </DialogTrigger>
@@ -282,29 +292,29 @@ export default function FinancePage() {
         </Dialog>
       </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Date Range
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-slate-500 opacity-70" />
+            Filter Period
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Start Date</label>
+        <CardContent className="p-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-slate-500 tracking-tight">Start Date</label>
               <Input
                 type="date"
-                className="h-12"
+                className="h-9 text-sm"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">End Date</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-slate-500">End Date</label>
               <Input
                 type="date"
-                className="h-12"
+                className="h-9 text-sm"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
               />
@@ -314,85 +324,86 @@ export default function FinancePage() {
       </Card>
 
       {(feedCostFromIssues > 0 || medCostFromIssues > 0) && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Cost from Inventory Issues</CardTitle>
-            <CardDescription>Costs calculated from inventory issue entries</CardDescription>
+        <Card className="shadow-sm border-blue-200 bg-blue-50/20">
+          <CardHeader className="py-1.5 px-3 border-b bg-blue-50/50">
+            <CardTitle className="text-xs font-bold text-blue-800">Inventory Costs</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Feed cost from inventory issues</p>
-                <p className="text-2xl font-bold text-blue-600">{formatINR(feedCostFromIssues)}</p>
+          <CardContent className="p-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-white rounded border border-blue-100 shadow-sm">
+                <p className="text-[9px] font-bold text-slate-500 uppercase">Feed Usage</p>
+                <p className="text-lg font-black text-blue-600 leading-tight">{formatINR(feedCostFromIssues)}</p>
               </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Medicine & vaccine cost from issues</p>
-                <p className="text-2xl font-bold text-green-600">{formatINR(medCostFromIssues)}</p>
+              <div className="p-2 bg-white rounded border border-green-100 shadow-sm">
+                <p className="text-[9px] font-bold text-slate-500 uppercase">Med Usage</p>
+                <p className="text-lg font-black text-green-600 leading-tight">{formatINR(medCostFromIssues)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card className="py-4">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Income</CardTitle>
+            <TrendingUp className="h-3.5 w-3.5 text-green-600 opacity-70" />
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold text-green-600">{formatINR(totalIncome)}</div>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-green-600 tracking-tight">{formatINR(totalIncome)}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Total received</p>
           </CardContent>
         </Card>
 
-        <Card className="py-4">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Expenses</CardTitle>
+            <TrendingDown className="h-3.5 w-3.5 text-red-600 opacity-70" />
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold text-red-600">{formatINR(totalExpenses)}</div>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-red-600 tracking-tight">{formatINR(totalExpenses)}</div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Total paid out</p>
           </CardContent>
         </Card>
 
-        <Card className="py-4">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Net Balance</CardTitle>
-            <DollarSign className="h-4 w-4" />
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Net Balance</CardTitle>
+            <DollarSign className="h-3.5 w-3.5 text-slate-400 opacity-70" />
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className={`text-2xl font-bold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+          <CardContent className="p-2.5">
+            <div className={`text-xl font-black ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
               {formatINR(balance)}
             </div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">{balance >= 0 ? "Surplus" : "Deficit"}</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Income by Category</CardTitle>
-            <CardDescription>Breakdown of income sources</CardDescription>
+      <div className="grid gap-2 md:grid-cols-2">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Income by Category</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2.5">
             {Object.keys(incomeByCategory).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No income recorded</p>
+              <p className="text-xs text-muted-foreground text-center py-4">No income recorded</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {Object.entries(incomeByCategory)
                   .sort(([, a], [, b]) => b - a)
                   .map(([category, amount]) => (
                     <div key={category} className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{category}</p>
-                        <div className="w-full bg-secondary h-2 rounded-full mt-1">
+                        <p className="text-[11px] font-medium">{category}</p>
+                        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-0.5">
                           <div
-                            className="bg-green-600 h-2 rounded-full"
+                            className="bg-green-600 h-1.5 rounded-full"
                             style={{ width: `${(amount / totalIncome) * 100}%` }}
                           />
                         </div>
                       </div>
-                      <p className="text-sm font-bold ml-4 text-green-600">{formatINR(amount)}</p>
+                      <p className="text-[11px] font-bold ml-4 text-green-600">{formatINR(amount)}</p>
                     </div>
                   ))}
               </div>
@@ -400,30 +411,30 @@ export default function FinancePage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Expenses by Category</CardTitle>
-            <CardDescription>Breakdown of expense categories</CardDescription>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Expenses by Category</CardTitle>
+            <CardDescription className="text-[9px] font-medium text-slate-400">Breakdown of spending</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3">
             {Object.keys(expensesByCategory).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded</p>
+              <p className="text-xs text-muted-foreground text-center py-4">No expenses recorded</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {Object.entries(expensesByCategory)
                   .sort(([, a], [, b]) => b - a)
                   .map(([category, amount]) => (
                     <div key={category} className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{category}</p>
-                        <div className="w-full bg-secondary h-2 rounded-full mt-1">
+                        <p className="text-[11px] font-medium">{category}</p>
+                        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-0.5">
                           <div
-                            className="bg-red-600 h-2 rounded-full"
+                            className="bg-red-600 h-1.5 rounded-full"
                             style={{ width: `${(amount / totalExpenses) * 100}%` }}
                           />
                         </div>
                       </div>
-                      <p className="text-sm font-bold ml-4 text-red-600">{formatINR(amount)}</p>
+                      <p className="text-[11px] font-bold ml-4 text-red-600">{formatINR(amount)}</p>
                     </div>
                   ))}
               </div>
@@ -432,15 +443,15 @@ export default function FinancePage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
-          <CardDescription>{sortedTransactions.length} transactions in selected period</CardDescription>
+      <Card className="shadow-sm border-slate-200/60">
+        <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+          <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Transaction History</CardTitle>
+          <CardDescription className="text-[9px] font-medium text-slate-400">{sortedTransactions.length} transactions in period</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {sortedTransactions.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No transactions recorded yet</p>
+            <div className="text-center py-8">
+              <p className="text-xs text-muted-foreground mb-3 font-medium">No transactions recorded yet</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First Transaction
@@ -450,14 +461,14 @@ export default function FinancePage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead className="text-right">Amount (₹)</TableHead>
-                    <TableHead className="text-center">Actions</TableHead>
+                  <TableRow className="h-10 bg-slate-50/50">
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Type</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Category</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Description</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight">Reference</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Amount</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -465,33 +476,33 @@ export default function FinancePage() {
                     <TableRow 
                       key={transaction.id}
                       id={`transaction-${transaction.id}`}
-                      className={highlightedTransactionId === transaction.id ? "bg-blue-50 border-blue-200 border-2" : ""}
+                      className={`h-11 ${highlightedTransactionId === transaction.id ? "bg-blue-50 border-blue-200 border-2" : ""}`}
                     >
-                      <TableCell>{formatIndianDate(transaction.date)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-xs py-1">{formatIndianDate(transaction.date)}</TableCell>
+                      <TableCell className="py-1">
                         <Badge
                           variant="secondary"
-                          className={transaction.type === "income" ? "bg-green-100" : "bg-red-100"}
+                          className={`${transaction.type === "income" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"} text-[9px] h-4 px-1.5 capitalize`}
                         >
                           {transaction.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{transaction.category}</TableCell>
-                      <TableCell className="max-w-xs truncate">{transaction.description || "-"}</TableCell>
-                      <TableCell>{transaction.reference || "-"}</TableCell>
+                      <TableCell className="text-xs font-bold py-1">{transaction.category}</TableCell>
+                      <TableCell className="text-[11px] py-1 max-w-xs truncate">{transaction.description || "-"}</TableCell>
+                      <TableCell className="text-[10px] py-1">{transaction.reference || "-"}</TableCell>
                       <TableCell
-                        className={`text-right font-bold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}
+                        className={`text-xs text-right font-bold py-1 ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}
                       >
                         {transaction.type === "income" ? "+" : "-"}
                         {formatINR(transaction.amount)}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEdit(transaction)}>
-                            <Edit className="h-4 w-4" />
+                      <TableCell className="py-1">
+                        <div className="flex justify-center gap-1.5">
+                          <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(transaction)}>
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(transaction.id)}>
-                            <Trash2 className="h-4 w-4" />
+                          <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(transaction.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>

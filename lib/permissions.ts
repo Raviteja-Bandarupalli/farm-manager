@@ -1,5 +1,6 @@
 import type { User } from "./auth-context"
-import type { Farm, House, Batch } from "./master-data-context"
+import type { Farm, House } from "./master-data-context"
+import type { Batch } from "./batch-context"
 
 export function canViewFarm(user: User | null, farmId: string): boolean {
   if (!user) return false

@@ -4,9 +4,19 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
+import { useFinance } from "./finance-context"
+
+export const CORE_INGREDIENTS = [
+  { code: "MAIZE", name: "Maize", category: "feed-raw", unit: "kg" },
+  { code: "SOYA", name: "Soya", category: "feed-raw", unit: "kg" },
+  { code: "BROKENRICE", name: "Broken Rice", category: "feed-raw", unit: "kg" },
+  { code: "SUPPL-5", name: "5% Supplement", category: "feed-raw", unit: "kg" },
+  { code: "OIL", name: "Oil", category: "feed-raw", unit: "liters" },
+] as const
 
 export interface InventoryItem {
   id: string
+  farmId: string
   code: string
   name: string
   category: "feed-raw" | "feed-finished" | "medicine" | "vaccine" | "litter" | "utilities" | "other"
@@ -44,6 +54,17 @@ export interface IssueEntry {
   createdAt: string
 }
 
+export interface StockTransfer {
+  id: string
+  date: string
+  itemId: string
+  sourceFarmId: string
+  destinationFarmId: string
+  quantity: number
+  driverNotes: string
+  createdAt: string
+}
+
 export interface SaleEntry {
   id: string
   date: string
@@ -64,12 +85,17 @@ interface InventoryContextType {
   purchases: PurchaseEntry[]
   issues: IssueEntry[]
   sales: SaleEntry[]
+  transfers: StockTransfer[]
   loading: boolean
   refetch: () => Promise<void>
   addItem: (item: Omit<InventoryItem, "id" | "createdAt" | "currentStock" | "averageCost">) => Promise<void>
   updateItem: (id: string, item: Partial<InventoryItem>) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   addPurchase: (purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId">) => Promise<PurchaseEntry | null>
+  addBulkPurchaseAndDispatch: (
+    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId" | "itemId"> & { ingredientCode: string },
+    dispatches: { farmId: string; quantity: number }[]
+  ) => Promise<PurchaseEntry | null>
   updatePurchase: (id: string, purchase: Partial<Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount">>) => Promise<void>
   deletePurchase: (id: string) => Promise<void>
   linkPurchaseToFinance: (purchaseId: string, financeTransactionId: string) => Promise<void>
@@ -78,35 +104,41 @@ interface InventoryContextType {
   deleteSale: (id: string) => Promise<void>
   linkSaleToFinance: (saleId: string, financeTransactionId: string) => Promise<void>
   addIssue: (issue: Omit<IssueEntry, "id" | "createdAt" | "costPerUnit" | "totalCost">) => Promise<void>
+  moveStock: (transfer: Omit<StockTransfer, "id" | "createdAt">) => Promise<void>
   getPurchasesByItem: (itemId: string) => PurchaseEntry[]
   getIssuesByItem: (itemId: string) => IssueEntry[]
   getIssuesByBatch: (batchId: string) => IssueEntry[]
   getSalesByBuyer: (buyerId: string) => SaleEntry[]
-  getLowStockItems: () => InventoryItem[]
+  getLowStockItems: (farmId?: string | null) => InventoryItem[]
   getItemById: (id: string) => InventoryItem | undefined
+  getItemByCodeAndFarm: (code: string, farmId: string | null) => InventoryItem | undefined
   getPurchaseById: (id: string) => PurchaseEntry | undefined
   getSaleById: (id: string) => SaleEntry | undefined
   getTotalBirdsSold: () => number
   getTotalRevenue: () => number
+  initializeCoreItems: (farms: { id: string }[]) => Promise<void>
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined)
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
+  const { addTransaction } = useFinance()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [purchases, setPurchases] = useState<PurchaseEntry[]>([])
   const [issues, setIssues] = useState<IssueEntry[]>([])
   const [sales, setSales] = useState<SaleEntry[]>([])
+  const [transfers, setTransfers] = useState<StockTransfer[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchInventory = useCallback(async () => {
     try {
       setLoading(true)
-      const [itemsRes, purchasesRes, salesRes, issuesRes] = await Promise.all([
+      const [itemsRes, purchasesRes, salesRes, issuesRes, transfersRes] = await Promise.all([
         supabase.from("inventory").select("*").order("code", { ascending: true, nullsFirst: false }),
         supabase.from("purchases").select("*").order("date", { ascending: false }),
         supabase.from("sales").select("*").order("date", { ascending: false }),
         supabase.from("issues").select("*").order("date", { ascending: false }),
+        supabase.from("transfers").select("*").order("date", { ascending: false }),
       ])
       if (itemsRes.error) throw itemsRes.error
       if (purchasesRes.error) throw purchasesRes.error
@@ -116,6 +148,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setSales((salesRes.data as SaleEntry[]) || [])
       if (issuesRes.error && issuesRes.error.code !== "PGRST116") throw issuesRes.error
       setIssues((issuesRes.data as IssueEntry[]) || [])
+      if (transfersRes.error && transfersRes.error.code !== "PGRST116") {
+        console.warn("Transfers table might not exist yet:", transfersRes.error.message)
+        setTransfers([])
+      } else {
+        setTransfers((transfersRes.data as StockTransfer[]) || [])
+      }
     } catch (e) {
       logFetchError("inventory (inventory, purchases, sales, issues)", e)
       setItems([])
@@ -171,12 +209,95 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
     const item = items.find((i) => i.id === purchase.itemId)
     if (item) {
-      const newStock = item.currentStock + purchase.quantity
-      const newAvg = newStock > 0 ? (item.currentStock * item.averageCost + totalAmount) / newStock : 0
+      const newStock = Number(item.currentStock) + Number(purchase.quantity)
+      const newAvg = newStock > 0 ? (Number(item.currentStock) * Number(item.averageCost) + totalAmount) / newStock : 0
       await supabase.from("inventory").update({ currentStock: newStock, averageCost: newAvg }).eq("id", purchase.itemId)
     }
     await fetchInventory()
     return data as PurchaseEntry
+  }
+
+  const addBulkPurchaseAndDispatch = async (
+    purchase: Omit<PurchaseEntry, "id" | "createdAt" | "totalAmount" | "financeTransactionId" | "itemId"> & { ingredientCode: string },
+    dispatches: { farmId: string; quantity: number }[]
+  ): Promise<PurchaseEntry | null> => {
+    try {
+      const totalQty = dispatches.reduce((sum, d) => sum + d.quantity, 0)
+      const coreIngredient = CORE_INGREDIENTS.find(c => c.code === purchase.ingredientCode)
+      if (!coreIngredient) throw new Error("Invalid ingredient selected")
+
+      for (const dispatch of dispatches) {
+        if (dispatch.quantity <= 0) continue;
+
+        let farmItem = items.find(i => i.code === coreIngredient.code && i.farmId === dispatch.farmId)
+        const dispatchCost = Math.round(dispatch.quantity * purchase.unitRate * 100) / 100
+        let targetItemId = ""
+
+        if (!farmItem) {
+          const newItemRow = {
+            id: `item-${coreIngredient.code}-${dispatch.farmId}-${Date.now()}`,
+            farmId: dispatch.farmId,
+            code: coreIngredient.code,
+            name: coreIngredient.name,
+            category: coreIngredient.category,
+            unit: coreIngredient.unit,
+            openingStock: 0,
+            openingValue: 0,
+            currentStock: dispatch.quantity,
+            averageCost: purchase.unitRate,
+            reorderLevel: 500,
+            createdAt: new Date().toISOString()
+          }
+          const { error: iError } = await supabase.from("inventory").insert(newItemRow)
+          if (iError) throw iError
+          targetItemId = newItemRow.id
+        } else {
+          const currentStock = Number(farmItem.currentStock || 0)
+          const currentAvgCost = Number(farmItem.averageCost || 0)
+          const newStock = currentStock + dispatch.quantity
+          const newAvg = newStock > 0
+            ? (currentStock * currentAvgCost + dispatch.quantity * purchase.unitRate) / newStock
+            : purchase.unitRate
+
+          await supabase.from("inventory")
+            .update({ currentStock: newStock, averageCost: newAvg })
+            .eq("id", farmItem.id)
+
+          targetItemId = farmItem.id
+        }
+
+        // Create Finance Entry per farm
+        await addTransaction({
+          type: "expense",
+          category: "Feed Purchase",
+          amount: dispatchCost,
+          date: purchase.date,
+          description: `${coreIngredient.name} Purchase - ${dispatch.quantity}kg`,
+          reference: purchase.invoiceNumber || "BULK_PURCHASE",
+          farmId: dispatch.farmId
+        })
+
+        // Create Purchase Entry per farm for clean ledger
+        const purchaseRow = {
+          id: `p-${Date.now()}-${dispatch.farmId}-${Math.random().toString(36).slice(2, 5)}`,
+          date: purchase.date,
+          supplierId: purchase.supplierId,
+          itemId: targetItemId,
+          quantity: dispatch.quantity,
+          unitRate: purchase.unitRate,
+          totalAmount: dispatchCost,
+          invoiceNumber: purchase.invoiceNumber,
+          createdAt: new Date().toISOString(),
+        }
+        await supabase.from("purchases").insert(purchaseRow)
+      }
+
+      await fetchInventory()
+      return null
+    } catch (err) {
+      console.error("Error in addBulkPurchaseAndDispatch:", err)
+      throw err
+    }
   }
 
   const linkPurchaseToFinance = async (purchaseId: string, financeTransactionId: string) => {
@@ -285,8 +406,85 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
     await supabase
       .from("inventory")
-      .update({ currentStock: Math.max(0, item.currentStock - issue.quantity) })
+      .update({ currentStock: Math.max(0, Number(item.currentStock) - Number(issue.quantity)) })
       .eq("id", issue.itemId)
+    await fetchInventory()
+  }
+
+  const moveStock = async (transfer: Omit<StockTransfer, "id" | "createdAt">) => {
+    const sourceItem = items.find(i => i.id === transfer.itemId)
+    if (!sourceItem) throw new Error("Source item not found")
+
+    if (!transfer.sourceFarmId || !transfer.destinationFarmId) {
+      throw new Error("Source and destination farms are required.")
+    }
+
+    if (Number(sourceItem.currentStock) < Number(transfer.quantity)) {
+      throw new Error(`Insufficient stock in source location. Available: ${sourceItem.currentStock}`)
+    }
+
+    let destItem = items.find(i => i.code === sourceItem.code && i.farmId === transfer.destinationFarmId)
+
+    if (!destItem) {
+      const newItemRow = {
+        id: `item-${sourceItem.code}-${transfer.destinationFarmId}-${Date.now()}`,
+        farmId: transfer.destinationFarmId,
+        code: sourceItem.code,
+        name: sourceItem.name,
+        category: sourceItem.category,
+        unit: sourceItem.unit,
+        openingStock: 0,
+        openingValue: 0,
+        currentStock: transfer.quantity,
+        averageCost: sourceItem.averageCost,
+        reorderLevel: sourceItem.reorderLevel,
+        createdAt: new Date().toISOString()
+      }
+      const { error } = await supabase.from("inventory").insert(newItemRow)
+      if (error) throw error
+    } else {
+      const newStock = Number(destItem.currentStock) + Number(transfer.quantity)
+      const newAvg = newStock > 0 ? (Number(destItem.currentStock) * Number(destItem.averageCost) + (transfer.quantity * sourceItem.averageCost)) / newStock : sourceItem.averageCost
+      await supabase.from("inventory").update({ currentStock: newStock, averageCost: newAvg }).eq("id", destItem.id)
+    }
+
+    await supabase.from("inventory").update({ currentStock: Number(sourceItem.currentStock) - Number(transfer.quantity) }).eq("id", sourceItem.id)
+
+    const transferRow = {
+      id: Date.now().toString(),
+      ...transfer,
+      createdAt: new Date().toISOString()
+    }
+    await supabase.from("transfers").insert(transferRow)
+
+    await fetchInventory()
+  }
+
+  const initializeCoreItems = async (farms: { id: string }[]) => {
+    const locations = farms.map(f => f.id)
+
+    for (const farmId of locations) {
+      for (const core of CORE_INGREDIENTS) {
+        const existing = items.find(i => i.code === core.code && i.farmId === farmId)
+        if (!existing) {
+          const row = {
+            id: `item-${core.code}-${farmId}-${Date.now()}`,
+            farmId,
+            code: core.code,
+            name: core.name,
+            category: core.category,
+            unit: core.unit,
+            openingStock: 0,
+            openingValue: 0,
+            currentStock: 0,
+            averageCost: 0,
+            reorderLevel: 500,
+            createdAt: new Date().toISOString()
+          }
+          await supabase.from("inventory").insert(row)
+        }
+      }
+    }
     await fetchInventory()
   }
 
@@ -302,8 +500,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     sales.filter((s) => s.buyerId === buyerId).sort((a, b) => b.date.localeCompare(a.date))
   const getTotalBirdsSold = () => sales.reduce((sum, s) => sum + s.birds, 0)
   const getTotalRevenue = () => sales.reduce((sum, s) => sum + s.totalValue, 0)
-  const getLowStockItems = () => items.filter((i) => i.currentStock <= i.reorderLevel)
+  const getLowStockItems = (farmId?: string | null) => {
+    let filtered = items
+    if (farmId !== undefined) {
+      filtered = items.filter(i => i.farmId === farmId)
+    }
+    return filtered.filter((i) => Number(i.currentStock) <= Number(i.reorderLevel))
+  }
   const getItemById = (id: string) => items.find((i) => i.id === id)
+  const getItemByCodeAndFarm = (code: string, farmId: string | null) => items.find(i => i.code === code && i.farmId === farmId)
 
   return (
     <InventoryContext.Provider
@@ -312,12 +517,14 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         purchases,
         issues,
         sales,
+        transfers,
         loading,
         refetch: fetchInventory,
         addItem,
         updateItem,
         deleteItem,
         addPurchase,
+        addBulkPurchaseAndDispatch,
         updatePurchase,
         deletePurchase,
         linkPurchaseToFinance,
@@ -326,16 +533,19 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         deleteSale,
         linkSaleToFinance,
         addIssue,
+        moveStock,
         getPurchasesByItem,
         getIssuesByItem,
         getIssuesByBatch,
         getSalesByBuyer,
         getLowStockItems,
         getItemById,
+        getItemByCodeAndFarm,
         getPurchaseById,
         getSaleById,
         getTotalBirdsSold,
         getTotalRevenue,
+        initializeCoreItems,
       }}
     >
       {children}

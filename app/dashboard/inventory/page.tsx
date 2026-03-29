@@ -1,21 +1,18 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import React, { useState } from "react"
 import { useMasterData } from "@/lib/master-data-context"
-import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
-import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry } from "@/lib/inventory-context"
-import { formatIndianDate } from "@/lib/utils"
+import { useInventory, CORE_INGREDIENTS } from "@/lib/inventory-context"
+import { useDailyLogs } from "@/lib/daily-logs-context"
+import { useFeedLogs } from "@/lib/feed-logs-context"
+import { formatIndianDate, cn } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Plus, Package, ShoppingCart, TrendingDown, TrendingUp, AlertTriangle, Edit, Trash2, ExternalLink } from "lucide-react"
-import Link from "next/link"
+import { Plus, Package, Edit, ArrowRightLeft } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -26,1075 +23,684 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-
-const CATEGORIES = [
-  { value: "feed-raw", label: "Feed Raw Material" },
-  { value: "feed-finished", label: "Finished Feed" },
-  { value: "medicine", label: "Medicine" },
-  { value: "vaccine", label: "Vaccine" },
-  { value: "litter", label: "Litter" },
-  { value: "utilities", label: "Utilities" },
-  { value: "other", label: "Other" },
-]
 
 export default function InventoryPage() {
-  const searchParams = useSearchParams()
-  const [activeTabState, setActiveTabState] = useState("items")
-  
-  useEffect(() => {
-    const tab = searchParams.get("tab") || "items"
-    setActiveTabState(tab)
-  }, [searchParams])
-  
-  const activeTab = activeTabState
-  
   const { suppliers, houses, farms } = useMasterData()
-  const { batches } = useBatch()
   const { user } = useAuth()
-  const { addTransaction, updateTransaction, deleteTransaction } = useFinance()
+  const { addTransaction } = useFinance()
   const {
     items,
     purchases,
     issues,
+    transfers,
     loading,
     addItem,
     updateItem,
     deleteItem,
     addPurchase,
+    addBulkPurchaseAndDispatch,
     updatePurchase,
     deletePurchase,
     linkPurchaseToFinance,
     addIssue,
+    moveStock,
     getItemById,
     getPurchaseById,
-    getIssuesByItem,
-    getLowStockItems,
+    initializeCoreItems,
   } = useInventory()
 
+  const { dailyLogs } = useDailyLogs()
+  const { feedLogs } = useFeedLogs()
+  const [selectedFarmId, setSelectedFarmId] = useState<string | null>(null)
+
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
-  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false)
-  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false)
+  const [isBulkPurchaseDialogOpen, setIsBulkPurchaseDialogOpen] = useState(false)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null)
 
   const [itemForm, setItemForm] = useState({
+    farmId: "" as string,
     code: "",
     name: "",
-    category: "feed-finished" as any,
-    unit: "",
+    category: "feed-raw" as any,
+    unit: "kg",
     openingStock: "",
     openingValue: "",
-    reorderLevel: "",
+    reorderLevel: "500",
   })
 
-  const [purchaseForm, setPurchaseForm] = useState({
+  const [bulkPurchaseForm, setBulkPurchaseForm] = useState({
     date: getTodayDate(),
     supplierId: "",
-    itemId: "",
-    quantity: "",
-    unitRate: "",
-    invoiceNumber: "",
+    ingredientCode: "",
+    totalKg: "",
+    totalBags: "",
+    totalCost: "",
+    dispatches: [] as { farmId: string; quantity: string; bags: string; manualOverride: boolean }[]
   })
 
-  const [issueForm, setIssueForm] = useState({
+  const [transferForm, setTransferForm] = useState({
     date: getTodayDate(),
-    batchId: "",
     itemId: "",
+    sourceFarmId: "",
+    destinationFarmId: "",
     quantity: "",
-    purpose: "",
+    driverNotes: ""
   })
 
-  const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      if (editingItemId) {
-        await updateItem(editingItemId, {
-          code: itemForm.code,
-          name: itemForm.name,
-          category: itemForm.category,
-          unit: itemForm.unit,
-          reorderLevel: Number.parseFloat(itemForm.reorderLevel),
-        })
-      } else {
-        await addItem({
-          code: itemForm.code,
-          name: itemForm.name,
-          category: itemForm.category,
-          unit: itemForm.unit,
-          openingStock: Number.parseFloat(itemForm.openingStock),
-          openingValue: Number.parseFloat(itemForm.openingValue),
-          reorderLevel: Number.parseFloat(itemForm.reorderLevel),
-        })
+  const handleDispatchChange = (index: number, field: string, value: string) => {
+    const newDispatches = [...bulkPurchaseForm.dispatches]
+    const d = { ...newDispatches[index] }
+    const totalKg = Number(bulkPurchaseForm.totalKg || 0)
+    const totalBags = Number(bulkPurchaseForm.totalBags || 0)
+    const avgKgPerBag = totalBags > 0 ? totalKg / totalBags : 0
+
+    if (field === 'bags') {
+      d.bags = value
+      const bags = Number(value)
+      if (bags >= 0 && avgKgPerBag > 0) {
+        d.quantity = (bags * avgKgPerBag).toFixed(2)
+        d.manualOverride = false
       }
-      resetItemForm()
-      setIsItemDialogOpen(false)
-    } catch (err) {
-      console.error("Error saving item:", err)
-      alert(err instanceof Error ? err.message : "Failed to save item.")
-    }
-  }
-
-  const resetItemForm = () => {
-    setItemForm({
-      code: "",
-      name: "",
-      category: "feed-finished",
-      unit: "",
-      openingStock: "",
-      openingValue: "",
-      reorderLevel: "",
-    })
-    setEditingItemId(null)
-  }
-
-  const handleEdit = (item: any) => {
-    setEditingItemId(item.id)
-    setItemForm({
-      code: item.code,
-      name: item.name,
-      category: item.category,
-      unit: item.unit,
-      openingStock: item.openingStock.toString(),
-      openingValue: item.openingValue.toString(),
-      reorderLevel: item.reorderLevel.toString(),
-    })
-    setIsItemDialogOpen(true)
-  }
-
-  const handleDelete = async (item: InventoryItem) => {
-    // Check if item has stock
-    const hasStock = item.currentStock > 0
-    const itemName = `${item.code} - ${item.name}`
-    
-    let confirmMessage = `Delete ${itemName}? This will remove it from inventory.`
-    if (hasStock) {
-      confirmMessage = `${itemName} has stock (${(() => {
-        const stock = typeof item.currentStock === 'number' ? item.currentStock : Number.parseFloat(String(item.currentStock).match(/^[\d.]+/)?.[0] || '0');
-        return isNaN(stock) ? '0.00' : stock.toFixed(2);
-      })()} ${item.unit}). Delete anyway?`
+    } else if (field === 'quantity') {
+      d.quantity = value
+      d.manualOverride = true
     }
 
-    if (confirm(confirmMessage)) {
-      try {
-        await deleteItem(item.id)
-      } catch (err) {
-        console.error("Error deleting item:", err)
-        alert("Failed to delete item.")
-      }
-    }
+    newDispatches[index] = d
+    setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
   }
 
-  const startAddNewItem = () => {
-    resetItemForm()
-    setIsItemDialogOpen(true)
-  }
-
-  const handleAddPurchase = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const quantity = Number.parseFloat(purchaseForm.quantity)
-    const unitRate = Number.parseFloat(purchaseForm.unitRate)
-    const item = getItemById(purchaseForm.itemId)
-    try {
-      if (editingPurchaseId) {
-        const existing = getPurchaseById(editingPurchaseId)
-        if (!existing) return
-        await updatePurchase(editingPurchaseId, {
-          date: purchaseForm.date,
-          supplierId: purchaseForm.supplierId,
-          itemId: purchaseForm.itemId,
-          quantity,
-          unitRate,
-          invoiceNumber: purchaseForm.invoiceNumber,
-        })
-        const totalAmount = quantity * unitRate
-        if (existing.financeTransactionId) {
-          const desc = item ? `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}` : `Purchase ${quantity.toFixed(0)} units`
-          const ref = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-          await updateTransaction(existing.financeTransactionId, {
-            type: "expense",
-            category: "Feed Purchase",
-            amount: totalAmount,
-            date: purchaseForm.date,
-            description: `${desc}${ref}`,
-            reference: purchaseForm.invoiceNumber || "",
-          })
-        } else if (item) {
-          const desc = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-          const ref = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-          const tx = await addTransaction({
-            type: "expense",
-            category: "Feed Purchase",
-            amount: quantity * unitRate,
-            date: purchaseForm.date,
-            description: `${desc}${ref}`,
-            reference: purchaseForm.invoiceNumber || "",
-          })
-          if (tx) await linkPurchaseToFinance(editingPurchaseId, tx.id)
-        }
-      } else {
-        const newPurchase = await addPurchase({
-          date: purchaseForm.date,
-          supplierId: purchaseForm.supplierId,
-          itemId: purchaseForm.itemId,
-          quantity,
-          unitRate,
-          invoiceNumber: purchaseForm.invoiceNumber,
-        })
-        if (item && newPurchase) {
-          const desc = `${item.code} ${item.name} ${quantity.toFixed(0)}${item.unit}`
-          const ref = purchaseForm.invoiceNumber ? ` INV-${purchaseForm.invoiceNumber}` : ""
-          const tx = await addTransaction({
-            type: "expense",
-            category: "Feed Purchase",
-            amount: newPurchase.totalAmount,
-            date: purchaseForm.date,
-            description: `${desc}${ref}`,
-            reference: purchaseForm.invoiceNumber || "",
-          })
-          if (tx) await linkPurchaseToFinance(newPurchase.id, tx.id)
-        }
-      }
-      resetPurchaseForm()
-      setIsPurchaseDialogOpen(false)
-    } catch (err) {
-      console.error("Error saving purchase:", err)
-      alert(err instanceof Error ? err.message : "Failed to save purchase.")
-    }
-  }
-
-  const resetPurchaseForm = () => {
-    setPurchaseForm({
+  const startBulkPurchase = () => {
+    setBulkPurchaseForm({
       date: getTodayDate(),
       supplierId: "",
-      itemId: "",
-      quantity: "",
-      unitRate: "",
-      invoiceNumber: "",
+      ingredientCode: "",
+      totalKg: "",
+      totalBags: "",
+      totalCost: "",
+      dispatches: farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
     })
-    setEditingPurchaseId(null)
+    setIsBulkPurchaseDialogOpen(true)
   }
 
-  const handleEditPurchase = (purchase: any) => {
-    setEditingPurchaseId(purchase.id)
-    setPurchaseForm({
-      date: purchase.date,
-      supplierId: purchase.supplierId,
-      itemId: purchase.itemId,
-      quantity: purchase.quantity.toString(),
-      unitRate: purchase.unitRate.toString(),
-      invoiceNumber: purchase.invoiceNumber || "",
-    })
-    setIsPurchaseDialogOpen(true)
-  }
+  const handleBulkPurchaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const activeDispatches = bulkPurchaseForm.dispatches
+      .filter(d => Number(d.quantity) > 0)
+      .map(d => ({ farmId: d.farmId, quantity: Number(d.quantity) }))
 
-  const handleDeletePurchase = async (purchase: PurchaseEntry) => {
-    const linkedIssues = getIssuesByItem(purchase.itemId)
-    const item = getItemById(purchase.itemId)
-    if (linkedIssues.length > 0) {
-      const purchaseDate = new Date(purchase.date)
-      const after = linkedIssues.filter((i) => new Date(i.date) >= purchaseDate)
-      if (after.length > 0) {
-        alert(`Cannot delete this purchase. It is linked to ${after.length} issue/consumption record(s) that occurred on or after the purchase date.`)
-        return
-      }
-    }
-    const itemName = item ? `${item.code} - ${item.name}` : "this item"
-    const qty = typeof purchase.quantity === "number" ? purchase.quantity.toFixed(2) : Number.parseFloat(String(purchase.quantity)).toFixed(2)
-    const unit = item?.unit || ""
-    if (!confirm(`Delete this purchase?\n\nStock will decrease by ${qty} ${unit}.\n\nItem: ${itemName}`)) return
-    try {
-      if (purchase.financeTransactionId) await deleteTransaction(purchase.financeTransactionId)
-      await deletePurchase(purchase.id)
-    } catch (err) {
-      console.error("Error deleting purchase:", err)
-      alert("Failed to delete purchase.")
-    }
-  }
+    const totalDispatchedKg = activeDispatches.reduce((sum, d) => sum + d.quantity, 0)
+    const lorryTotalKg = Number(bulkPurchaseForm.totalKg || 0)
 
-  const startAddNewPurchase = () => {
-    resetPurchaseForm()
-    setIsPurchaseDialogOpen(true)
-  }
-
-  const syncExistingPurchasesToFinance = async () => {
-    const without = purchases.filter((p) => !p.financeTransactionId)
-    if (without.length === 0) {
-      alert("All purchases are already synced with finance!")
+    if (activeDispatches.length === 0) {
+      alert("Please enter quantities for at least one location.")
       return
     }
-    if (!confirm(`This will create ${without.length} finance expense(s) for existing purchases. Continue?`)) return
-    let synced = 0
-    for (const p of without) {
-      const item = getItemById(p.itemId)
-      if (!item) continue
-      try {
-        const desc = `${item.code} ${item.name} ${p.quantity.toFixed(0)}${item.unit}`
-        const ref = p.invoiceNumber ? ` INV-${p.invoiceNumber}` : ""
-        const tx = await addTransaction({
-          type: "expense",
-          category: "Feed Purchase",
-          amount: p.totalAmount,
-          date: p.date,
-          description: `${desc}${ref}`,
-          reference: p.invoiceNumber || "",
-        })
-        if (tx) {
-          await linkPurchaseToFinance(p.id, tx.id)
-          synced++
-        }
-      } catch (e) {
-        console.error("Sync purchase failed:", e)
-      }
+
+    if (Math.abs(totalDispatchedKg - lorryTotalKg) > 0.05) {
+      alert(`The sum of dispatches must match the Total Lorry Load.`)
+      return
     }
-    alert(`Successfully synced ${synced} purchase(s) with finance expenses!`)
+
+    try {
+      const unitRate = Number(bulkPurchaseForm.totalCost || 0) / lorryTotalKg
+      await addBulkPurchaseAndDispatch({
+        date: bulkPurchaseForm.date,
+        supplierId: bulkPurchaseForm.supplierId,
+        ingredientCode: bulkPurchaseForm.ingredientCode,
+        unitRate: unitRate,
+        invoiceNumber: "CHALLAN-" + Date.now().toString().slice(-6),
+        quantity: lorryTotalKg,
+      }, activeDispatches)
+      setIsBulkPurchaseDialogOpen(false)
+    } catch (err) {
+      console.error(err)
+      alert("Failed to save bulk purchase.")
+    }
   }
 
-  const handleAddIssue = async (e: React.FormEvent) => {
+  const handleTransferSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await addIssue({
-        date: issueForm.date,
-        batchId: issueForm.batchId,
-        itemId: issueForm.itemId,
-        quantity: Number.parseFloat(issueForm.quantity),
-        purpose: issueForm.purpose,
+      if (transferForm.sourceFarmId === transferForm.destinationFarmId) {
+        alert("Source and destination cannot be the same.")
+        return
+      }
+      await moveStock({
+        date: transferForm.date,
+        itemId: transferForm.itemId,
+        sourceFarmId: transferForm.sourceFarmId,
+        destinationFarmId: transferForm.destinationFarmId,
+        quantity: Number(transferForm.quantity),
+        driverNotes: transferForm.driverNotes
       })
-      setIssueForm({
-        date: getTodayDate(),
-        batchId: "",
-        itemId: "",
-        quantity: "",
-        purpose: "",
-      })
-      setIsIssueDialogOpen(false)
+      setIsTransferDialogOpen(false)
     } catch (err) {
-      console.error("Error adding issue:", err)
-      alert(err instanceof Error ? err.message : "Failed to add issue.")
+      console.error(err)
+      alert("Failed to transfer stock.")
     }
   }
 
-  const lowStockItems = getLowStockItems()
-  const totalValue = items.reduce((sum, item) => sum + item.currentStock * item.averageCost, 0)
+  const filteredItems = selectedFarmId
+    ? items.filter(i => i.farmId === selectedFarmId)
+    : items
+
+  const displayTotalValue = filteredItems.reduce((sum, item) => sum + (Number(item.currentStock) * Number(item.averageCost)), 0)
+  const displayMaize = filteredItems.filter(i => i.code === "MAIZE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const displaySoya = filteredItems.filter(i => i.code === "SOYA").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const displayBrokenRice = filteredItems.filter(i => i.code === "BROKENRICE").reduce((sum, i) => sum + Number(i.currentStock), 0)
+  const displayOil = filteredItems.filter(i => i.code === "OIL").reduce((sum, i) => sum + Number(i.currentStock), 0)
+
+  // Calculate 7-day average mixing for alerts
+  const getAverageDailyMixing = (farmId: string | null, code: string) => {
+    const last7Days = new Date()
+    last7Days.setDate(last7Days.getDate() - 7)
+    const dateStr = last7Days.toISOString().split('T')[0]
+
+    const logs = feedLogs.filter(l => (farmId ? l.farmId === farmId : true) && l.date >= dateStr)
+    if (logs.length === 0) return 0
+
+    let total = 0
+    logs.forEach(l => {
+      if (code === "MAIZE") total += Number(l.maizeKg || 0)
+      if (code === "SOYA") total += Number(l.soyaKg || 0)
+      if (code === "BROKENRICE") total += Number(l.brokenRiceKg || 0)
+      if (code === "SUPPL-5") total += Number(l.suppl5Kg || 0)
+    })
+
+    return total / 7
+  }
+
+  const getDaysLeft = (farmId: string | null) => {
+    const ingredients = ["MAIZE", "SOYA", "BROKENRICE", "OIL"]
+    let minDays = 99
+
+    ingredients.forEach(code => {
+      const stock = filteredItems.filter(i => i.code === code).reduce((sum, i) => sum + Number(i.currentStock), 0)
+      const avg = getAverageDailyMixing(farmId, code)
+      if (avg > 0) {
+        const days = stock / avg
+        if (days < minDays) minDays = days
+      }
+    })
+
+    return minDays === 99 ? "-" : Math.floor(minDays).toString()
+  }
+
+  const daysLeft = getDaysLeft(selectedFarmId)
+
+  const movementHistory = [
+    ...purchases.map(p => ({ ...p, type: 'purchase' as const })),
+    ...issues.map(i => ({ ...i, type: 'issue' as const })),
+    ...transfers.map(t => ({ ...t, type: 'transfer' as const }))
+  ].sort((a, b) => {
+    const dateComp = b.date.localeCompare(a.date)
+    if (dateComp !== 0) return dateComp
+    return (b as any).createdAt?.localeCompare((a as any).createdAt) || 0
+  })
+
+  const filteredHistory = movementHistory.filter(m => {
+    if (!selectedFarmId) return true
+    if (m.type === 'purchase') {
+      const item = items.find(i => i.id === m.itemId)
+      return item?.farmId === selectedFarmId
+    }
+    if (m.type === 'issue') {
+      const item = items.find(i => i.id === m.itemId)
+      return item?.farmId === selectedFarmId
+    }
+    if (m.type === 'transfer') {
+      return m.sourceFarmId === selectedFarmId || m.destinationFarmId === selectedFarmId
+    }
+    return false
+  })
+
+  const isCoreSetupComplete = farms.every(farm =>
+    ["MAIZE", "SOYA", "BROKENRICE", "SUPPL-5"].every(code =>
+      items.some(item => item.code === code && item.farmId === farm.id)
+    )
+  )
+
+  const handleInitializeCore = async () => {
+    if (confirm("Initialize core inventory items for all farms?")) {
+      try {
+        await initializeCoreItems(farms)
+        alert("Inventory initialization complete!")
+      } catch (err) {
+        console.error(err)
+        alert("Failed to initialize inventory.")
+      }
+    }
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      {/* Header Section */}
+      <div className="flex items-center justify-between py-1">
         <div>
-          <h1 className="text-3xl font-bold">Inventory Management</h1>
-          <p className="text-muted-foreground mt-1">Track items, purchases, and issues for your broiler farm</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Inventory Dashboard</h1>
+          <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Centralized Stock & Mixing Control</p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={isItemDialogOpen} onOpenChange={(open) => {
-            setIsItemDialogOpen(open)
-            if (!open) {
-              resetItemForm()
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button variant="outline" onClick={startAddNewItem}>
-                <Package className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingItemId ? "Edit Item" : "Add New Item"}</DialogTitle>
-                <DialogDescription>
-                  {editingItemId ? "Update inventory item details" : "Create a new inventory item master"}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddItem} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Item Code</label>
-                    <Input
-                      value={itemForm.code}
-                      onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })}
-                      placeholder="e.g., FEED-001"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Item Name</label>
-                    <Input
-                      value={itemForm.name}
-                      onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                      placeholder="e.g., Broiler Starter Feed"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Category</label>
-                    <Select
-                      value={itemForm.category}
-                      onValueChange={(value: any) => setItemForm({ ...itemForm, category: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Unit</label>
-                    <Input
-                      value={itemForm.unit}
-                      onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
-                      placeholder="kg, L, pcs"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Opening Stock</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={itemForm.openingStock}
-                      onChange={(e) => setItemForm({ ...itemForm, openingStock: e.target.value })}
-                      required={!editingItemId}
-                      disabled={editingItemId}
-                      className={editingItemId ? "bg-muted" : ""}
-                    />
-                    {editingItemId && (
-                      <p className="text-xs text-muted-foreground">Historical value - cannot be changed</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Opening Value (₹)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={itemForm.openingValue}
-                      onChange={(e) => setItemForm({ ...itemForm, openingValue: e.target.value })}
-                      required={!editingItemId}
-                      disabled={editingItemId}
-                      className={editingItemId ? "bg-muted" : ""}
-                    />
-                    {editingItemId && (
-                      <p className="text-xs text-muted-foreground">Historical value - cannot be changed</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Reorder Level</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={itemForm.reorderLevel}
-                      onChange={(e) => setItemForm({ ...itemForm, reorderLevel: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full">
-                  {editingItemId ? "Update Item" : "Add Item"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {user?.role === "owner" && (
+            <>
+              <Dialog open={isBulkPurchaseDialogOpen} onOpenChange={setIsBulkPurchaseDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="default"
+                    className="bg-slate-900 text-white hover:bg-slate-800 h-9 px-4 text-[11px] font-extrabold uppercase tracking-wider"
+                    onClick={startBulkPurchase}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Stock Entry
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl">
+                  <DialogHeader className="p-6 border-b bg-white">
+                    <DialogTitle className="text-xl font-black tracking-tight uppercase">New Stock Entry</DialogTitle>
+                    <DialogDescription className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Record bulk purchase and dispatch to farms</DialogDescription>
+                  </DialogHeader>
 
-          <Dialog open={isPurchaseDialogOpen} onOpenChange={(open) => {
-            setIsPurchaseDialogOpen(open)
-            if (!open) {
-              resetPurchaseForm()
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button variant="outline" onClick={startAddNewPurchase}>
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Purchase Entry
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingPurchaseId ? "Edit Purchase" : "Record Purchase"}</DialogTitle>
-                <DialogDescription>
-                  {editingPurchaseId ? "Update purchase entry details" : "Add a new purchase entry"}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddPurchase} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input
-                    type="date"
-                    value={purchaseForm.date}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Supplier</label>
-                  <Select
-                    value={purchaseForm.supplierId}
-                    onValueChange={(value) => setPurchaseForm({ ...purchaseForm, supplierId: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Item</label>
-                  <Select
-                    value={purchaseForm.itemId}
-                    onValueChange={(value) => setPurchaseForm({ ...purchaseForm, itemId: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.code} - {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Quantity</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={purchaseForm.quantity}
-                      onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Unit Rate (₹)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={purchaseForm.unitRate}
-                      onChange={(e) => setPurchaseForm({ ...purchaseForm, unitRate: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Invoice Number</label>
-                  <Input
-                    value={purchaseForm.invoiceNumber}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceNumber: e.target.value })}
-                    placeholder="e.g., INV-2024-001"
-                  />
-                </div>
-                {purchaseForm.quantity && purchaseForm.unitRate && (
-                  <div className="p-3 bg-secondary rounded-lg">
-                    <p className="text-sm font-medium">
-                      Total Amount: ₹
-                      {(Number.parseFloat(purchaseForm.quantity) * Number.parseFloat(purchaseForm.unitRate)).toFixed(2)}
-                    </p>
-                  </div>
-                )}
-                <Button type="submit" className="w-full">
-                  {editingPurchaseId ? "Update Purchase" : "Record Purchase"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <form onSubmit={handleBulkPurchaseSubmit} className="p-6 space-y-6 bg-white">
+                    <div className="space-y-2 bg-slate-50 p-2.5 rounded-lg border">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Supplier</label>
+                          <Select
+                            value={bulkPurchaseForm.supplierId}
+                            onValueChange={(v) => setBulkPurchaseForm({ ...bulkPurchaseForm, supplierId: v })}
+                            required
+                          >
+                            <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
+                              <SelectValue placeholder="Select Supplier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {suppliers.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Ingredient</label>
+                          <Select
+                            value={bulkPurchaseForm.ingredientCode}
+                            onValueChange={(v) => {
+                              const initialDispatches = farms.map(f => ({ farmId: f.id, quantity: "", bags: "", manualOverride: false }))
+                              setBulkPurchaseForm({ ...bulkPurchaseForm, ingredientCode: v, dispatches: initialDispatches })
+                            }}
+                            required
+                          >
+                            <SelectTrigger className="h-9 bg-white text-xs font-bold border-slate-200">
+                              <SelectValue placeholder="Select Ingredient" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CORE_INGREDIENTS.map((core) => (
+                                <SelectItem key={core.code} value={core.code}>{core.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-          <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <TrendingDown className="h-4 w-4 mr-2" />
-                Issue Entry
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Record Issue</DialogTitle>
-                <DialogDescription>Issue items to a batch</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddIssue} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input
-                    type="date"
-                    className="h-12"
-                    value={issueForm.date}
-                    onChange={(e) => setIssueForm({ ...issueForm, date: e.target.value })}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">Selected: {formatIndianDate(issueForm.date)}</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Batch</label>
-                  <Select
-                    value={issueForm.batchId}
-                    onValueChange={(value) => setIssueForm({ ...issueForm, batchId: value })}
-                    required
-                  >
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Select batch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {batches
-                        .filter((b) => {
-                          if (b.status !== "active") return false
-                          if (user?.role === "owner") return true
-                          const house = houses.find((h) => h.id === b.houseId)
-                          if (!house) return false
-                          return user?.assignedFarmIds?.includes(house.farmId)
-                        })
-                        .map((batch) => (
-                          <SelectItem key={batch.id} value={batch.id}>
-                            {batch.batchNumber} - {batch.breed}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Item</label>
-                  <Select
-                    value={issueForm.itemId}
-                    onValueChange={(value) => setIssueForm({ ...issueForm, itemId: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.code} - {item.name} (Stock: {item.currentStock} {item.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Quantity</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={issueForm.quantity}
-                    onChange={(e) => setIssueForm({ ...issueForm, quantity: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Purpose</label>
-                  <Input
-                    value={issueForm.purpose}
-                    onChange={(e) => setIssueForm({ ...issueForm, purpose: e.target.value })}
-                    placeholder="e.g., Daily feeding, medication"
-                    required
-                  />
-                </div>
-                {issueForm.itemId && issueForm.quantity && (
-                  <div className="p-3 bg-secondary rounded-lg">
-                    <p className="text-sm font-medium">
-                      Estimated Cost: ₹
-                      {(
-                        Number.parseFloat(issueForm.quantity) * (getItemById(issueForm.itemId)?.averageCost || 0)
-                      ).toFixed(2)}
-                    </p>
-                  </div>
-                )}
-                <Button type="submit" className="w-full">
-                  Record Issue
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end pt-1">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total KG</label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            className="h-9 bg-white text-xs font-bold border-slate-200"
+                            value={bulkPurchaseForm.totalKg}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalKg: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Price (₹)</label>
+                          <Input
+                            type="number"
+                            className="h-9 bg-white text-xs font-bold border-slate-200"
+                            value={bulkPurchaseForm.totalCost}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalCost: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Total Bags</label>
+                          <Input
+                            type="number"
+                            className="h-9 bg-white text-xs font-bold border-slate-200"
+                            value={bulkPurchaseForm.totalBags}
+                            onChange={(e) => setBulkPurchaseForm({ ...bulkPurchaseForm, totalBags: e.target.value })}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Farm Wise Dispatch</h3>
+                        {Number(bulkPurchaseForm.totalKg) > 0 && Number(bulkPurchaseForm.totalBags) > 0 && (
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">
+                            Avg: {(Number(bulkPurchaseForm.totalKg) / Number(bulkPurchaseForm.totalBags)).toFixed(2)} KG / Bag
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 border-b">
+                            <tr>
+                              <th className="py-2 px-4 font-black uppercase text-[10px]">Location</th>
+                              <th className="py-2 px-4 font-black uppercase text-[10px] w-32">Bags</th>
+                              <th className="py-2 px-4 font-black uppercase text-[10px] w-48 text-right">Exact KG</th>
+                              <th className="py-2 px-4 w-12"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {bulkPurchaseForm.dispatches.map((dispatch, idx) => {
+                              const farm = farms.find(f => f.id === dispatch.farmId)
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                  <td className="py-3 px-4 font-bold text-slate-700">{farm?.name || "Unknown"}</td>
+                                  <td className="py-2 px-4">
+                                    <Input
+                                      type="number"
+                                      placeholder="0"
+                                      className="h-9 font-bold border-slate-300"
+                                      value={dispatch.bags}
+                                      onChange={(e) => handleDispatchChange(idx, 'bags', e.target.value)}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-4">
+                                    <div className="flex items-center gap-2 justify-end">
+                                      <Input
+                                        type="number"
+                                        step="0.1"
+                                        placeholder="0.0"
+                                        className={cn(
+                                          "h-9 w-32 font-black text-right",
+                                          dispatch.manualOverride ? "border-amber-400 bg-amber-50" : "bg-slate-100 border-slate-200 text-slate-500"
+                                        )}
+                                        value={dispatch.quantity}
+                                        onChange={(e) => handleDispatchChange(idx, 'quantity', e.target.value)}
+                                      />
+                                      <span className="text-[10px] font-bold text-slate-400">KG</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-4 text-center">
+                                    {dispatch.manualOverride && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-amber-600"
+                                        onClick={() => {
+                                          const newDispatches = [...bulkPurchaseForm.dispatches]
+                                          const avg = Number(bulkPurchaseForm.totalKg) / Number(bulkPurchaseForm.totalBags)
+                                          newDispatches[idx] = { ...dispatch, quantity: (Number(dispatch.bags) * avg).toFixed(2), manualOverride: false }
+                                          setBulkPurchaseForm({ ...bulkPurchaseForm, dispatches: newDispatches })
+                                        }}
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                          <tfoot className="bg-slate-900 text-white font-black">
+                            <tr>
+                              <td className="py-2.5 px-4 uppercase text-[10px]">Current Total</td>
+                              <td className="py-2.5 px-4">{bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.bags || 0), 0)} Bags</td>
+                              <td className="py-2.5 px-4 text-right">
+                                {bulkPurchaseForm.dispatches.reduce((s,d) => s + Number(d.quantity || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 pt-4 border-t">
+                      <div className="flex items-center justify-center min-h-8">
+                        {Number(bulkPurchaseForm.totalKg) > 0 && (() => {
+                          const diff = Number(bulkPurchaseForm.totalKg) - bulkPurchaseForm.dispatches.reduce((s, d) => s + Number(d.quantity || 0), 0)
+                          const ok = Math.abs(diff) < 0.05
+                          return (
+                            <div className="flex items-center gap-2">
+                              {ok ? <span className="text-[11px] font-black uppercase text-green-700">READY TO RECORD.</span> : <span className="text-[11px] font-black uppercase text-red-600">WAITING FOR ALL STOCK TO BE ASSIGNED (DIFF: {diff.toFixed(2)} KG).</span>}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Button variant="outline" type="button" onClick={() => setIsBulkPurchaseDialogOpen(false)} className="font-bold uppercase text-[11px] h-10 px-6">Cancel</Button>
+                        <Button type="submit" className="font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 px-10 h-10" disabled={Math.abs(Number(bulkPurchaseForm.totalKg) - bulkPurchaseForm.dispatches.reduce((s, d) => s + Number(d.quantity || 0), 0)) > 0.1}>Confirm & Record Stock</Button>
+                      </div>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="h-9 px-4 text-[11px] font-extrabold uppercase tracking-wider">
+                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                    Move Stock
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Inter-Farm Stock Transfer</DialogTitle>
+                    <DialogDescription>Move existing stock between farm locations</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleTransferSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Date</label>
+                      <Input type="date" value={transferForm.date} onChange={(e) => setTransferForm({ ...transferForm, date: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Source Location</label>
+                      <Select value={transferForm.sourceFarmId || ""} onValueChange={(v) => setTransferForm({ ...transferForm, sourceFarmId: v, itemId: "" })} required>
+                        <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                        <SelectContent>{farms.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Ingredient</label>
+                      <Select value={transferForm.itemId} onValueChange={(v) => setTransferForm({ ...transferForm, itemId: v })} required>
+                        <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
+                        <SelectContent>{items.filter(i => i.farmId === transferForm.sourceFarmId).map((item) => (<SelectItem key={item.id} value={item.id}>{item.name} (Stock: {item.currentStock} KG)</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Destination Location</label>
+                      <Select value={transferForm.destinationFarmId || ""} onValueChange={(v) => setTransferForm({ ...transferForm, destinationFarmId: v })} required>
+                        <SelectTrigger><SelectValue placeholder="Select destination" /></SelectTrigger>
+                        <SelectContent>{farms.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Quantity (KG)</label>
+                      <Input type="number" step="0.1" value={transferForm.quantity} onChange={(e) => setTransferForm({ ...transferForm, quantity: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Driver Notes / Tractor #</label>
+                      <Input value={transferForm.driverNotes} onChange={(e) => setTransferForm({ ...transferForm, driverNotes: e.target.value })} placeholder="e.g., Tractor 1 - Ramesh" />
+                    </div>
+                    <Button type="submit" className="w-full">Confirm Transfer</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </div>
       </div>
 
-      {lowStockItems.length > 0 && (
-        <Card className="mb-6 border-orange-500">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-600">
-              <AlertTriangle className="h-5 w-5" />
-              Low Stock Alert
-            </CardTitle>
-            <CardDescription>{lowStockItems.length} items below reorder level</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {lowStockItems.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {item.code} - {item.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Current: {(() => {
-                        const stock = typeof item.currentStock === 'number' ? item.currentStock : Number.parseFloat(String(item.currentStock).match(/^[\d.]+/)?.[0] || '0');
-                        return isNaN(stock) ? '0.00' : stock.toFixed(2);
-                      })()} {item.unit} | Reorder: {item.reorderLevel.toFixed(2)} {item.unit}
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                    Low Stock
-                  </Badge>
-                </div>
-              ))}
+      {!isCoreSetupComplete && user?.role === "owner" && (
+        <Card className="mb-4 bg-blue-50 border-blue-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Package className="h-5 w-5 text-blue-800" />
+              <p className="text-sm font-bold text-blue-800 tracking-tight">Initialize professional inventory tracking for all locations.</p>
             </div>
+            <Button onClick={handleInitializeCore} size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 text-xs font-bold uppercase px-6">Setup Now</Button>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+      {/* Dynamic Scoreboard */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Total Value</span>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{items.length}</div>
-            <p className="text-xs text-muted-foreground">Items in inventory</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">₹{displayTotalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">{selectedFarmId ? farms.find(f => f.id === selectedFarmId)?.name : "All Farms"}</p>
           </CardContent>
         </Card>
-
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Maize</span>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">₹{totalValue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Current inventory value</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">{displayMaize.toLocaleString()} <span className="text-xs">KG</span></div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(displayMaize / 50).toFixed(0)} Bags</p>
           </CardContent>
         </Card>
-
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Soya</span>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{purchases.length}</div>
-            <p className="text-xs text-muted-foreground">Purchase entries</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">{displaySoya.toLocaleString()} <span className="text-xs">KG</span></div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">~{(displaySoya / 50).toFixed(0)} Bags</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Broken Rice</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">{displayBrokenRice.toLocaleString()} <span className="text-xs">KG</span></div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Clean Rice</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Oil Stock</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight text-slate-900">{displayOil.toLocaleString()} <span className="text-xs">Ltr</span></div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Cooking Oil</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-none">
+          <CardHeader className="py-1.5 px-3 border-b">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">Days Left</span>
+          </CardHeader>
+          <CardContent className="p-2.5">
+            <div className={cn("text-xl font-black tracking-tight", (Number(daysLeft) < 3 && daysLeft !== "-") ? "text-red-600 animate-pulse" : "text-slate-900")}>
+              {daysLeft} <span className="text-xs">DAYS</span>
+            </div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Mix Avg</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
-        setActiveTabState(value)
-        if (typeof window !== "undefined") {
-          const url = new URL(window.location.href)
-          url.searchParams.set("tab", value)
-          window.history.pushState({}, "", url)
-        }
-      }}>
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-          <TabsTrigger value="items">Item Master</TabsTrigger>
-          <TabsTrigger value="purchases">Purchases</TabsTrigger>
-          <TabsTrigger value="issues">Issues</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="items" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Item Master</CardTitle>
-              <CardDescription>All inventory items with current stock and average cost</CardDescription>
-            </CardHeader>
-            <CardContent>
-                  {items.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No items added yet</p>
-                  <Button onClick={startAddNewItem}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Your First Item
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Current Stock</TableHead>
-                        <TableHead className="text-right">Avg Cost (₹)</TableHead>
-                        <TableHead className="text-right">Value (₹)</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
+      {/* Main Content Ledger */}
+      <Card className="shadow-sm border-none mt-4">
+        <CardHeader className="py-3 px-4 border-b">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Filter by Farm</label>
+              <Select value={selectedFarmId || "all"} onValueChange={(v) => setSelectedFarmId(v === "all" ? null : v)}>
+                <SelectTrigger className="w-64 h-9 bg-slate-50 border-slate-200 text-xs font-bold">
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs font-bold">All Locations</SelectItem>
+                  {farms.map((f) => (<SelectItem key={f.id} value={f.id} className="text-xs font-bold">{f.name}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col items-end">
+              <CardTitle className="text-base font-bold">Stock Movement Ledger</CardTitle>
+              <CardDescription className="text-[10px] uppercase font-bold text-slate-400">Unified history of purchases & mixing</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="h-10">
+                  <TableHead className="text-[10px] font-extrabold uppercase pl-6 w-28">Date</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase">Farm</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase">Item</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase text-right">Rate</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase text-right">Quantity</TableHead>
+                  <TableHead className="text-[10px] font-extrabold uppercase text-right pr-6">Closing</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredHistory.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="text-center py-10 text-slate-400 italic text-xs">No records found.</TableCell></TableRow>
+                ) : (
+                  filteredHistory.map((m: any, idx) => {
+                    let farmName = "-", itemName = "-", qtyColor = "text-slate-900", rateStr = "-", typeLabel = ""
+                    if (m.type === 'purchase') {
+                      const item = items.find(i => i.id === m.itemId)
+                      farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
+                      itemName = item?.name || "-"
+                      qtyColor = "text-green-600"
+                      rateStr = `₹${Number(m.unitRate).toFixed(2)}`
+                      typeLabel = "Purchase"
+                    } else if (m.type === 'issue') {
+                      const item = items.find(i => i.id === m.itemId)
+                      farmName = farms.find(f => f.id === item?.farmId)?.name || "-"
+                      itemName = item?.name || "-"
+                      qtyColor = "text-red-600"
+                      rateStr = `₹${Number(m.costPerUnit || 0).toFixed(2)}`
+                      typeLabel = "Daily Mix"
+                    } else if (m.type === 'transfer') {
+                      const item = items.find(i => i.id === m.itemId)
+                      const from = farms.find(f => f.id === m.sourceFarmId)?.name || "Unknown"
+                      const to = farms.find(f => f.id === m.destinationFarmId)?.name || "Unknown"
+                      farmName = `${from} → ${to}`
+                      itemName = item?.name || "-"
+                      qtyColor = "text-blue-600"
+                      typeLabel = "Move"
+                    }
+                    return (
+                      <TableRow key={idx} className="h-11 hover:bg-slate-50/50 border-b">
+                        <TableCell className="pl-6">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-slate-600">{formatIndianDate(m.date)}</span>
+                            <span className="text-[8px] font-black uppercase text-slate-300 tracking-tighter">{typeLabel}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-[11px] font-extrabold text-slate-700">{farmName}</TableCell>
+                        <TableCell className="text-[11px] font-bold text-slate-900">{itemName}</TableCell>
+                        <TableCell className="text-right text-[10px] font-medium text-slate-500">{rateStr}</TableCell>
+                        <TableCell className={cn("text-right font-black text-xs", qtyColor)}>
+                          {m.type === 'issue' ? '-' : '+'}{Number(m.quantity).toLocaleString()} KG
+                        </TableCell>
+                        <TableCell className="text-right pr-6 text-[11px] font-black text-slate-400">-</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.code}</TableCell>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell className="capitalize">
-                            {CATEGORIES.find((c) => c.value === item.category)?.label}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {(() => {
-                              // Extract only the numeric part (handles cases where value might be "6000.00 6000")
-                              let stock: number;
-                              if (typeof item.currentStock === 'number') {
-                                stock = item.currentStock;
-                              } else {
-                                // If it's a string, extract first numeric value
-                                const stockStr = String(item.currentStock).trim();
-                                const match = stockStr.match(/^[\d.]+/);
-                                stock = match ? Number.parseFloat(match[0]) : Number.parseFloat(stockStr);
-                              }
-                              return isNaN(stock) ? '0.00' : stock.toFixed(2);
-                            })()} {item.unit}
-                          </TableCell>
-                          <TableCell className="text-right">{item.averageCost.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">
-                            {(item.currentStock * item.averageCost).toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            {item.currentStock <= item.reorderLevel ? (
-                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                                Low Stock
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                OK
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleEdit(item)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDelete(item)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="purchases" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Purchase Entries</CardTitle>
-                  <CardDescription>All purchase transactions</CardDescription>
-                </div>
-                {purchases.some((p) => !p.financeTransactionId) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={syncExistingPurchasesToFinance}
-                    className="text-green-600 hover:text-green-700"
-                  >
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Sync Existing Purchases to Finance
-                  </Button>
+                    )
+                  })
                 )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {purchases.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No purchases recorded yet</p>
-                  <Button onClick={startAddNewPurchase}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Purchase Entry
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Rate (₹)</TableHead>
-                        <TableHead className="text-right">Amount (₹)</TableHead>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {purchases
-                        .sort((a, b) => b.date.localeCompare(a.date))
-                        .map((purchase) => {
-                          const item = getItemById(purchase.itemId)
-                          const supplier = suppliers.find((s) => s.id === purchase.supplierId)
-                          return (
-                            <TableRow key={purchase.id}>
-                              <TableCell>{new Date(purchase.date).toLocaleDateString()}</TableCell>
-                              <TableCell>{supplier?.name || "Unknown"}</TableCell>
-                              <TableCell>
-                                {item ? `${item.code} - ${item.name}` : "Item Deleted"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {(() => {
-                                  // Extract only the numeric part (handles cases where value might be "6000.00 6000")
-                                  let qty: number;
-                                  if (typeof purchase.quantity === 'number') {
-                                    qty = purchase.quantity;
-                                  } else {
-                                    // If it's a string, extract first numeric value
-                                    const qtyStr = String(purchase.quantity).trim();
-                                    const match = qtyStr.match(/^[\d.]+/);
-                                    qty = match ? Number.parseFloat(match[0]) : Number.parseFloat(qtyStr);
-                                  }
-                                  return isNaN(qty) ? '0.00' : qty.toFixed(2);
-                                })()} {item?.unit || ""}
-                              </TableCell>
-                              <TableCell className="text-right">{purchase.unitRate.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-medium">
-                                {purchase.totalAmount.toFixed(2)}
-                              </TableCell>
-                              <TableCell>{purchase.invoiceNumber || "-"}</TableCell>
-                              <TableCell>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" onClick={() => handleEditPurchase(purchase)}>
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="destructive" size="sm" onClick={() => handleDeletePurchase(purchase)}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                  {purchase.financeTransactionId && (
-                                    <Link href={`/dashboard/finance?transactionId=${purchase.financeTransactionId}`}>
-                                      <Button variant="ghost" size="sm" title="View in Finance">
-                                        <ExternalLink className="h-4 w-4 text-green-600" />
-                                      </Button>
-                                    </Link>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="issues" className="space-y-4">
-          {issues.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Issue Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">Total Feed Issued</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      {issues
-                        .filter((issue) => {
-                          const item = getItemById(issue.itemId)
-                          return item && (item.category === "feed-raw" || item.category === "feed-finished")
-                        })
-                        .reduce((sum, issue) => sum + issue.quantity, 0)
-                        .toFixed(2)}{" "}
-                      kg
-                    </p>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">Total Medicine & Vaccine Cost</p>
-                    <p className="text-xl font-bold text-green-600">
-                      ₹
-                      {issues
-                        .filter((issue) => {
-                          const item = getItemById(issue.itemId)
-                          return item && (item.category === "medicine" || item.category === "vaccine")
-                        })
-                        .reduce((sum, issue) => sum + issue.totalCost, 0)
-                        .toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Issue History</CardTitle>
-              <CardDescription>{issues.length} total issues</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {issues.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No issues recorded yet</p>
-                  <Button onClick={() => setIsIssueDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Issue Entry
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Batch</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Cost/Unit (₹)</TableHead>
-                        <TableHead className="text-right">Total Cost (₹)</TableHead>
-                        <TableHead>Purpose</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {issues
-                        .sort((a, b) => b.date.localeCompare(a.date))
-                        .map((issue) => {
-                          const item = getItemById(issue.itemId)
-                          const batch = batches.find((b) => b.id === issue.batchId)
-                          return (
-                            <TableRow key={issue.id}>
-                              <TableCell>{new Date(issue.date).toLocaleDateString()}</TableCell>
-                              <TableCell>{batch?.batchNumber || "Unknown"}</TableCell>
-                              <TableCell>
-                                {item ? `${item.code} - ${item.name}` : "Item Deleted"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {issue.quantity.toFixed(2)} {item?.unit || ""}
-                              </TableCell>
-                              <TableCell className="text-right">{issue.costPerUnit.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-medium">{issue.totalCost.toFixed(2)}</TableCell>
-                              <TableCell>{issue.purpose}</TableCell>
-                            </TableRow>
-                          )
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

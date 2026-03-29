@@ -50,3 +50,30 @@ export function buildBatchName(houseName: string, placementDate: string): string
   const formatted = formatBatchDate(placementDate)
   return `${houseName} – ${formatted}`
 }
+
+/**
+ * Returns a sortable date key YYYY-MM-DD from various date inputs
+ */
+export function toDateKey(dateStr: string): number {
+  if (!dateStr) return 0
+  try {
+    if (dateStr.includes("-")) {
+      const parts = dateStr.split("-")
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        const d = new Date(dateStr + "T00:00:00Z")
+        return isNaN(d.getTime()) ? 0 : d.getTime()
+      } else {
+        // DD-MM-YYYY
+        const [dd, mm, yyyy] = parts
+        const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00Z`)
+        return isNaN(d.getTime()) ? 0 : d.getTime()
+      }
+    }
+    const fallback = new Date(dateStr)
+    return isNaN(fallback.getTime()) ? 0 : fallback.getTime()
+  } catch (e) {
+    console.error("Error parsing date:", dateStr, e)
+    return 0
+  }
+}

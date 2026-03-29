@@ -13,6 +13,7 @@ export interface Transaction {
   date: string
   description: string
   reference: string
+  farmId?: string
   createdAt: string
 }
 
