@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useMasterData } from "@/lib/master-data-context"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus } from "lucide-react"
@@ -13,7 +13,7 @@ interface FeedLog {
   id: string
   farm_id: string
   date: string
-  feed_type: FeedType
+  feed_type: string
   maize_kg: number
   soya_kg: number
   rice_kg: number
@@ -24,7 +24,6 @@ interface FeedLog {
 
 export default function FeedLogsPage() {
   const { farms } = useMasterData()
-  const supabase = createClient()
   const [logs, setLogs] = useState<FeedLog[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -70,9 +69,9 @@ export default function FeedLogsPage() {
   }
 
   const filteredLogs = filterFarm === "all" ? logs : logs.filter(l => l.farm_id === filterFarm)
-  const totalMaize = filteredLogs.reduce((s, l) => s + l.maize_kg, 0)
-  const totalSoya = filteredLogs.reduce((s, l) => s + l.soya_kg, 0)
-  const totalProduced = filteredLogs.reduce((s, l) => s + l.total_kg, 0)
+  const totalMaize = filteredLogs.reduce((s, l) => s + (l.maize_kg || 0), 0)
+  const totalSoya = filteredLogs.reduce((s, l) => s + (l.soya_kg || 0), 0)
+  const totalProduced = filteredLogs.reduce((s, l) => s + (l.total_kg || 0), 0)
   const getFarmName = (id: string) => (farms as any[]).find(f => f.id === id)?.name || id
 
   return (
