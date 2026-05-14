@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
+import { toDateKey } from "./daily-logs-context"
 
 export interface WeeklyFeedLog {
   id: string
@@ -72,19 +73,22 @@ export function WeeklyFeedProvider({ children }: { children: React.ReactNode }) 
   }
 
   const getFeedsByBatch = (batchId: string) =>
-    weeklyFeeds.filter((f) => f.batchId === batchId).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+    weeklyFeeds.filter((f) => f.batchId === batchId).sort((a, b) => toDateKey(a.weekStart) - toDateKey(b.weekStart))
 
-  const getTotalFeedForBatch = (batchId: string, upToDate?: string) =>
-    weeklyFeeds
+  const getTotalFeedForBatch = (batchId: string, upToDate?: string) => {
+    const upToDateKey = upToDate ? toDateKey(upToDate) : Number.MAX_SAFE_INTEGER
+    return weeklyFeeds
       .filter((f) => f.batchId === batchId)
-      .filter((f) => !upToDate || f.weekEnd <= upToDate)
+      .filter((f) => toDateKey(f.weekEnd) <= upToDateKey)
       .reduce((sum, f) => sum + f.totalFeedKg, 0)
+  }
 
   const getLatestWeightForBatch = (batchId: string, upToDate?: string) => {
+    const upToDateKey = upToDate ? toDateKey(upToDate) : Number.MAX_SAFE_INTEGER
     const feeds = weeklyFeeds
       .filter((f) => f.batchId === batchId)
-      .filter((f) => !upToDate || f.weekEnd <= upToDate)
-      .sort((a, b) => b.weekEnd.localeCompare(a.weekEnd))
+      .filter((f) => toDateKey(f.weekEnd) <= upToDateKey)
+      .sort((a, b) => toDateKey(b.weekEnd) - toDateKey(a.weekEnd))
     return feeds[0]?.averageWeightKg ?? 0
   }
 

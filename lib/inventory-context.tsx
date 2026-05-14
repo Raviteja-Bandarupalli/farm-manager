@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
+import { toDateKey } from "./daily-logs-context"
 
 export interface InventoryItem {
   id: string
@@ -104,18 +105,28 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setLoading(true)
       const [itemsRes, purchasesRes, salesRes, issuesRes] = await Promise.all([
         supabase.from("inventory").select("*").order("code", { ascending: true, nullsFirst: false }),
-        supabase.from("purchases").select("*").order("date", { ascending: false }),
-        supabase.from("sales").select("*").order("date", { ascending: false }),
-        supabase.from("issues").select("*").order("date", { ascending: false }),
+        supabase.from("purchases").select("*"),
+        supabase.from("sales").select("*"),
+        supabase.from("issues").select("*"),
       ])
       if (itemsRes.error) throw itemsRes.error
       if (purchasesRes.error) throw purchasesRes.error
       if (salesRes.error) throw salesRes.error
+
+      const purchaseList = (purchasesRes.data as PurchaseEntry[]) || []
+      purchaseList.sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+
+      const salesList = (salesRes.data as SaleEntry[]) || []
+      salesList.sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+
       setItems((itemsRes.data as InventoryItem[]) || [])
-      setPurchases((purchasesRes.data as PurchaseEntry[]) || [])
-      setSales((salesRes.data as SaleEntry[]) || [])
+      setPurchases(purchaseList)
+      setSales(salesList)
+
       if (issuesRes.error && issuesRes.error.code !== "PGRST116") throw issuesRes.error
-      setIssues((issuesRes.data as IssueEntry[]) || [])
+      const issuesList = (issuesRes.data as IssueEntry[]) || []
+      issuesList.sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
+      setIssues(issuesList)
     } catch (e) {
       logFetchError("inventory (inventory, purchases, sales, issues)", e)
       setItems([])
@@ -291,15 +302,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }
 
   const getPurchasesByItem = (itemId: string) =>
-    purchases.filter((p) => p.itemId === itemId).sort((a, b) => b.date.localeCompare(a.date))
+    purchases.filter((p) => p.itemId === itemId).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
   const getIssuesByItem = (itemId: string) =>
-    issues.filter((i) => i.itemId === itemId).sort((a, b) => b.date.localeCompare(a.date))
+    issues.filter((i) => i.itemId === itemId).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
   const getIssuesByBatch = (batchId: string) =>
-    issues.filter((i) => i.batchId === batchId).sort((a, b) => b.date.localeCompare(a.date))
+    issues.filter((i) => i.batchId === batchId).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
   const getPurchaseById = (id: string) => purchases.find((p) => p.id === id)
   const getSaleById = (id: string) => sales.find((s) => s.id === id)
   const getSalesByBuyer = (buyerId: string) =>
-    sales.filter((s) => s.buyerId === buyerId).sort((a, b) => b.date.localeCompare(a.date))
+    sales.filter((s) => s.buyerId === buyerId).sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
   const getTotalBirdsSold = () => sales.reduce((sum, s) => sum + s.birds, 0)
   const getTotalRevenue = () => sales.reduce((sum, s) => sum + s.totalValue, 0)
   const getLowStockItems = () => items.filter((i) => i.currentStock <= i.reorderLevel)

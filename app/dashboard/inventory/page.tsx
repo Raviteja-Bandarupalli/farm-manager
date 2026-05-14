@@ -9,6 +9,7 @@ import { useBatch } from "@/lib/batch-context"
 import { useAuth } from "@/lib/auth-context"
 import { useFinance } from "@/lib/finance-context"
 import { useInventory, type InventoryItem, type PurchaseEntry, type IssueEntry } from "@/lib/inventory-context"
+import { toDateKey } from "@/lib/daily-logs-context"
 import { formatIndianDate } from "@/lib/utils"
 import { getTodayDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
@@ -293,8 +294,8 @@ export default function InventoryPage() {
     const linkedIssues = getIssuesByItem(purchase.itemId)
     const item = getItemById(purchase.itemId)
     if (linkedIssues.length > 0) {
-      const purchaseDate = new Date(purchase.date)
-      const after = linkedIssues.filter((i) => new Date(i.date) >= purchaseDate)
+      const purchaseTime = toDateKey(purchase.date)
+      const after = linkedIssues.filter((i) => toDateKey(i.date) >= purchaseTime)
       if (after.length > 0) {
         alert(`Cannot delete this purchase. It is linked to ${after.length} issue/consumption record(s) that occurred on or after the purchase date.`)
         return
@@ -379,11 +380,11 @@ export default function InventoryPage() {
   const totalValue = items.reduce((sum, item) => sum + item.currentStock * item.averageCost, 0)
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Inventory Management</h1>
-          <p className="text-muted-foreground mt-1">Track items, purchases, and issues for your broiler farm</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Inventory</h1>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Track items, purchases, and issues</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isItemDialogOpen} onOpenChange={(open) => {
@@ -393,8 +394,8 @@ export default function InventoryPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button variant="outline" onClick={startAddNewItem}>
-                <Package className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={startAddNewItem}>
+                <Package className="h-4 w-4 mr-1.5" />
                 Add Item
               </Button>
             </DialogTrigger>
@@ -511,8 +512,8 @@ export default function InventoryPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button variant="outline" onClick={startAddNewPurchase}>
-                <ShoppingCart className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={startAddNewPurchase}>
+                <ShoppingCart className="h-4 w-4 mr-1.5" />
                 Purchase Entry
               </Button>
             </DialogTrigger>
@@ -618,8 +619,8 @@ export default function InventoryPage() {
 
           <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <TrendingDown className="h-4 w-4 mr-2" />
+              <Button size="sm" className="h-8 text-xs font-bold">
+                <TrendingDown className="h-4 w-4 mr-1.5" />
                 Issue Entry
               </Button>
             </DialogTrigger>
@@ -725,23 +726,22 @@ export default function InventoryPage() {
       </div>
 
       {lowStockItems.length > 0 && (
-        <Card className="mb-6 border-orange-500">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-600">
-              <AlertTriangle className="h-5 w-5" />
-              Low Stock Alert
+        <Card className="border-orange-200 shadow-sm bg-orange-50/20">
+          <CardHeader className="py-1.5 px-3 border-b bg-orange-50/50">
+            <CardTitle className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-orange-700">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Low Stock Alert ({lowStockItems.length})
             </CardTitle>
-            <CardDescription>{lowStockItems.length} items below reorder level</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="p-2">
+            <div className="space-y-1.5">
               {lowStockItems.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                <div key={item.id} className="flex justify-between items-center p-2 bg-orange-50/50 rounded border border-orange-100 shadow-sm">
                   <div>
-                    <p className="font-medium">
+                    <p className="text-xs font-bold">
                       {item.code} - {item.name}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Current: {(() => {
                         const stock = typeof item.currentStock === 'number' ? item.currentStock : Number.parseFloat(String(item.currentStock).match(/^[\d.]+/)?.[0] || '0');
                         return isNaN(stock) ? '0.00' : stock.toFixed(2);
@@ -758,39 +758,39 @@ export default function InventoryPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+      <div className="grid gap-2 md:grid-cols-3">
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Items</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{items.length}</div>
-            <p className="text-xs text-muted-foreground">Items in inventory</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{items.length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Items in inventory</p>
           </CardContent>
         </Card>
 
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Value</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">₹{totalValue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Current inventory value</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black text-blue-600 tracking-tight">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Current value</p>
           </CardContent>
         </Card>
 
-        <Card className="py-4">
-          <CardHeader className="pb-1 px-6 pt-0">
-            <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+        <Card className="shadow-sm border-slate-200/60">
+          <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+            <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Purchases</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pt-0">
-            <div className="text-2xl font-bold">{purchases.length}</div>
-            <p className="text-xs text-muted-foreground">Purchase entries</p>
+          <CardContent className="p-2.5">
+            <div className="text-xl font-black tracking-tight">{purchases.length}</div>
+            <p className="text-[10px] text-muted-foreground font-medium">Purchase entries</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs value={activeTab} className="space-y-4" onValueChange={(value) => {
+      <Tabs value={activeTab} className="space-y-3" onValueChange={(value) => {
         setActiveTabState(value)
         if (typeof window !== "undefined") {
           const url = new URL(window.location.href)
@@ -798,22 +798,22 @@ export default function InventoryPage() {
           window.history.pushState({}, "", url)
         }
       }}>
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-          <TabsTrigger value="items">Item Master</TabsTrigger>
-          <TabsTrigger value="purchases">Purchases</TabsTrigger>
-          <TabsTrigger value="issues">Issues</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto h-9 p-1 bg-slate-100">
+          <TabsTrigger value="items" className="text-xs h-7 font-bold">Item Master</TabsTrigger>
+          <TabsTrigger value="purchases" className="text-xs h-7 font-bold">Purchases</TabsTrigger>
+          <TabsTrigger value="issues" className="text-xs h-7 font-bold">Issues</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="items" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Item Master</CardTitle>
-              <CardDescription>All inventory items with current stock and average cost</CardDescription>
+        <TabsContent value="items" className="space-y-3">
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Item Master</CardTitle>
+              <CardDescription className="text-[9px] font-medium text-slate-400">Current stock and average cost</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
                   {items.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No items added yet</p>
+                <div className="text-center py-8">
+                  <p className="text-xs text-muted-foreground mb-3 font-medium">No items added yet</p>
                   <Button onClick={startAddNewItem}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Item
@@ -823,26 +823,26 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Current Stock</TableHead>
-                        <TableHead className="text-right">Avg Cost (₹)</TableHead>
-                        <TableHead className="text-right">Value (₹)</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
+                      <TableRow className="h-10 bg-slate-50/50">
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Code</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Name</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Category</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Current Stock</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Avg Cost (₹)</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Value (₹)</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Status</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.code}</TableCell>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell className="capitalize">
+                        <TableRow key={item.id} className="h-11">
+                          <TableCell className="text-xs font-bold py-1">{item.code}</TableCell>
+                          <TableCell className="text-xs py-1">{item.name}</TableCell>
+                          <TableCell className="text-[10px] py-1 capitalize text-slate-500">
                             {CATEGORIES.find((c) => c.value === item.category)?.label}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-xs py-1 text-right font-medium">
                             {(() => {
                               // Extract only the numeric part (handles cases where value might be "6000.00 6000")
                               let stock: number;
@@ -857,28 +857,28 @@ export default function InventoryPage() {
                               return isNaN(stock) ? '0.00' : stock.toFixed(2);
                             })()} {item.unit}
                           </TableCell>
-                          <TableCell className="text-right">{item.averageCost.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-xs py-1 text-right">{item.averageCost.toFixed(2)}</TableCell>
+                          <TableCell className="text-xs py-1 text-right font-bold">
                             {(item.currentStock * item.averageCost).toFixed(2)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-1">
                             {item.currentStock <= item.reorderLevel ? (
-                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-[9px] h-4 px-1.5">
                                 Low Stock
                               </Badge>
                             ) : (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 text-[9px] h-4 px-1.5">
                                 OK
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleEdit(item)}>
-                                <Edit className="h-4 w-4" />
+                          <TableCell className="py-1">
+                            <div className="flex justify-center gap-1.5">
+                              <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(item)}>
+                                <Edit className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDelete(item)}>
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(item)}>
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </TableCell>
@@ -892,31 +892,31 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="purchases" className="space-y-4">
-          <Card>
-            <CardHeader>
+        <TabsContent value="purchases" className="space-y-3">
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Purchase Entries</CardTitle>
-                  <CardDescription>All purchase transactions</CardDescription>
+                  <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Purchase Entries</CardTitle>
+                  <CardDescription className="text-[9px] font-medium text-slate-400">All purchase transactions</CardDescription>
                 </div>
                 {purchases.some((p) => !p.financeTransactionId) && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={syncExistingPurchasesToFinance}
-                    className="text-green-600 hover:text-green-700"
+                    className="h-8 text-xs font-bold text-green-600 hover:text-green-700 bg-white"
                   >
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Sync Existing Purchases to Finance
+                    <TrendingUp className="h-4 w-4 mr-1.5" />
+                    Sync Finance
                   </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {purchases.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No purchases recorded yet</p>
+                <div className="text-center py-8">
+                  <p className="text-xs text-muted-foreground mb-3 font-medium">No purchases recorded yet</p>
                   <Button onClick={startAddNewPurchase}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Purchase Entry
@@ -926,31 +926,31 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Rate (₹)</TableHead>
-                        <TableHead className="text-right">Amount (₹)</TableHead>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
+                      <TableRow className="h-10 bg-slate-50/50">
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Supplier</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Item</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Qty</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Rate</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Amount</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Inv #</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {purchases
-                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
                         .map((purchase) => {
                           const item = getItemById(purchase.itemId)
                           const supplier = suppliers.find((s) => s.id === purchase.supplierId)
                           return (
-                            <TableRow key={purchase.id}>
-                              <TableCell>{new Date(purchase.date).toLocaleDateString()}</TableCell>
-                              <TableCell>{supplier?.name || "Unknown"}</TableCell>
-                              <TableCell>
+                            <TableRow key={purchase.id} className="h-11">
+                              <TableCell className="text-xs py-1">{formatIndianDate(purchase.date)}</TableCell>
+                              <TableCell className="text-[11px] py-1 font-medium">{supplier?.name || "Unknown"}</TableCell>
+                              <TableCell className="text-[11px] py-1">
                                 {item ? `${item.code} - ${item.name}` : "Item Deleted"}
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="text-xs py-1 text-right">
                                 {(() => {
                                   // Extract only the numeric part (handles cases where value might be "6000.00 6000")
                                   let qty: number;
@@ -965,23 +965,23 @@ export default function InventoryPage() {
                                   return isNaN(qty) ? '0.00' : qty.toFixed(2);
                                 })()} {item?.unit || ""}
                               </TableCell>
-                              <TableCell className="text-right">{purchase.unitRate.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-medium">
+                              <TableCell className="text-xs py-1 text-right">{purchase.unitRate.toFixed(2)}</TableCell>
+                              <TableCell className="text-xs py-1 text-right font-bold text-slate-900">
                                 {purchase.totalAmount.toFixed(2)}
                               </TableCell>
-                              <TableCell>{purchase.invoiceNumber || "-"}</TableCell>
-                              <TableCell>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" onClick={() => handleEditPurchase(purchase)}>
-                                    <Edit className="h-4 w-4" />
+                              <TableCell className="text-[10px] py-1">{purchase.invoiceNumber || "-"}</TableCell>
+                              <TableCell className="py-1">
+                                <div className="flex justify-center gap-1.5">
+                                  <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => handleEditPurchase(purchase)}>
+                                    <Edit className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="destructive" size="sm" onClick={() => handleDeletePurchase(purchase)}>
-                                    <Trash2 className="h-4 w-4" />
+                                  <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeletePurchase(purchase)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                   {purchase.financeTransactionId && (
                                     <Link href={`/dashboard/finance?transactionId=${purchase.financeTransactionId}`}>
-                                      <Button variant="ghost" size="sm" title="View in Finance">
-                                        <ExternalLink className="h-4 w-4 text-green-600" />
+                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="View in Finance">
+                                        <ExternalLink className="h-3.5 w-3.5 text-green-600" />
                                       </Button>
                                     </Link>
                                   )}
@@ -998,17 +998,17 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="issues" className="space-y-4">
+        <TabsContent value="issues" className="space-y-3">
           {issues.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Issue Summary</CardTitle>
+            <Card className="shadow-sm border-slate-200/60 bg-blue-50/10">
+              <CardHeader className="py-1.5 px-3 border-b bg-slate-50/50">
+                <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Issue Summary</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">Total Feed Issued</p>
-                    <p className="text-xl font-bold text-blue-600">
+              <CardContent className="p-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="p-2.5 bg-white rounded border border-blue-100 shadow-sm">
+                    <p className="text-[9px] uppercase font-bold text-slate-500 mb-1">Total Feed Issued</p>
+                    <p className="text-lg font-black text-blue-600 leading-tight">
                       {issues
                         .filter((issue) => {
                           const item = getItemById(issue.itemId)
@@ -1019,9 +1019,9 @@ export default function InventoryPage() {
                       kg
                     </p>
                   </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">Total Medicine & Vaccine Cost</p>
-                    <p className="text-xl font-bold text-green-600">
+                  <div className="p-2.5 bg-white rounded border border-green-100 shadow-sm">
+                    <p className="text-[9px] uppercase font-bold text-slate-500 mb-1">Total Med/Vacc Cost</p>
+                    <p className="text-lg font-black text-green-600 leading-tight">
                       ₹
                       {issues
                         .filter((issue) => {
@@ -1037,15 +1037,15 @@ export default function InventoryPage() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Issue History</CardTitle>
-              <CardDescription>{issues.length} total issues</CardDescription>
+          <Card className="shadow-sm border-slate-200/60">
+            <CardHeader className="py-1.5 px-3 border-b bg-slate-50/80">
+              <CardTitle className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Issue History</CardTitle>
+              <CardDescription className="text-[9px] font-medium text-slate-400">{issues.length} total issues</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {issues.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No issues recorded yet</p>
+                <div className="text-center py-8">
+                  <p className="text-xs text-muted-foreground mb-3 font-medium">No issues recorded yet</p>
                   <Button onClick={() => setIsIssueDialogOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Issue Entry
@@ -1055,35 +1055,35 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Batch</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Cost/Unit (₹)</TableHead>
-                        <TableHead className="text-right">Total Cost (₹)</TableHead>
-                        <TableHead>Purpose</TableHead>
+                      <TableRow className="h-10 bg-slate-50/50">
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Date</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Batch</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Item</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Qty</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Cost/Unit</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight text-right">Total</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-tight">Purpose</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {issues
-                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .sort((a, b) => toDateKey(b.date) - toDateKey(a.date))
                         .map((issue) => {
                           const item = getItemById(issue.itemId)
                           const batch = batches.find((b) => b.id === issue.batchId)
                           return (
-                            <TableRow key={issue.id}>
-                              <TableCell>{new Date(issue.date).toLocaleDateString()}</TableCell>
-                              <TableCell>{batch?.batchNumber || "Unknown"}</TableCell>
-                              <TableCell>
+                            <TableRow key={issue.id} className="h-11">
+                              <TableCell className="text-xs py-1">{formatIndianDate(issue.date)}</TableCell>
+                              <TableCell className="text-xs py-1 font-medium">{batch?.batchNumber || "Unknown"}</TableCell>
+                              <TableCell className="text-[11px] py-1">
                                 {item ? `${item.code} - ${item.name}` : "Item Deleted"}
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="text-xs py-1 text-right font-medium">
                                 {issue.quantity.toFixed(2)} {item?.unit || ""}
                               </TableCell>
-                              <TableCell className="text-right">{issue.costPerUnit.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-medium">{issue.totalCost.toFixed(2)}</TableCell>
-                              <TableCell>{issue.purpose}</TableCell>
+                              <TableCell className="text-xs py-1 text-right">{issue.costPerUnit.toFixed(2)}</TableCell>
+                              <TableCell className="text-xs py-1 text-right font-bold text-slate-900">{issue.totalCost.toFixed(2)}</TableCell>
+                              <TableCell className="text-[10px] py-1 italic">{issue.purpose}</TableCell>
                             </TableRow>
                           )
                         })}
