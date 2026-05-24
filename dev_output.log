@@ -1,0 +1,77 @@
+
+> farm-manager@1.0.0 dev
+> next dev
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.2:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ⚠ Minimum recommended TypeScript version is v5.1.0, older versions can potentially be incompatible with Next.js. Detected: 5.0.2
+ ✓ Ready in 19.8s
+ ○ Compiling /login ...
+ GET /login 200 in 9.0s (compile: 8.1s, render: 827ms)
+ ○ Compiling /dashboard ...
+ ⨯ ./app/dashboard/page.tsx:27:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m 25 |[39m   [33mSelectValue[39m[33m,[39m
+ [90m 26 |[39m } [36mfrom[39m [32m"@/components/ui/select"[39m
+[31m[1m>[22m[39m[90m 27 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m"@/components/ui/progress"[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 28 |[39m [36mimport[39m {
+ [90m 29 |[39m   [33mLineChart[39m[33m,[39m
+ [90m 30 |[39m   [33mLine[39m[33m,[39m[0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./app/dashboard/page.tsx [Client Component Browser]
+    ./app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/dashboard/page.tsx [Client Component SSR]
+    ./app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ GET /dashboard 500 in 7.9s (compile: 7.6s, render: 285ms)
+ ⨯ ./app/dashboard/page.tsx:27:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m 25 |[39m   [33mSelectValue[39m[33m,[39m
+ [90m 26 |[39m } [36mfrom[39m [32m"@/components/ui/select"[39m
+[31m[1m>[22m[39m[90m 27 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m"@/components/ui/progress"[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 28 |[39m [36mimport[39m {
+ [90m 29 |[39m   [33mLineChart[39m[33m,[39m
+ [90m 30 |[39m   [33mLine[39m[33m,[39m[0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./app/dashboard/page.tsx [Client Component Browser]
+    ./app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/dashboard/page.tsx [Client Component SSR]
+    ./app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ GET /dashboard 500 in 82ms (compile: 68ms, render: 13ms)
+ ✓ Compiled in 168ms
+ GET /login 200 in 86ms (compile: 8ms, render: 78ms)
+ GET /dashboard 200 in 470ms (compile: 326ms, render: 144ms)
+ GET /dashboard 200 in 965ms (compile: 186ms, render: 779ms)
+ GET /login 200 in 31ms (compile: 4ms, render: 27ms)
+ GET /login 200 in 797ms (compile: 23ms, render: 774ms)
+ GET /dashboard 200 in 68ms (compile: 9ms, render: 59ms)
+ GET /login 200 in 67ms (compile: 5ms, render: 61ms)
+ GET /dashboard 200 in 246ms (compile: 108ms, render: 138ms)

@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { logFetchError } from "@/lib/supabase-errors"
+import { toDateKey } from "./daily-logs-context"
 
 export interface Batch {
   id: string
@@ -40,9 +41,11 @@ export function BatchProvider({ children }: { children: React.ReactNode }) {
   const fetchBatches = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("batches").select("*").order("placementDate", { ascending: false })
+      const { data, error } = await supabase.from("batches").select("*")
       if (error) throw error
       const list = (data as Batch[]) || []
+      // Sort by placementDate descending
+      list.sort((a, b) => toDateKey(b.placementDate) - toDateKey(a.placementDate))
       setBatches(
         list.map((b: any) => ({
           ...b,
@@ -92,7 +95,7 @@ export function BatchProvider({ children }: { children: React.ReactNode }) {
   const getActiveBatchByHouse = (houseId: string) =>
     batches.find((b) => b.houseId === houseId && b.status === "active")
   const getBatchesByHouse = (houseId: string) =>
-    batches.filter((b) => b.houseId === houseId).sort((a, b) => b.placementDate.localeCompare(a.placementDate))
+    batches.filter((b) => b.houseId === houseId).sort((a, b) => toDateKey(b.placementDate) - toDateKey(a.placementDate))
 
   return (
     <BatchContext.Provider
